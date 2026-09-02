@@ -42,6 +42,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 <body>
 
 <div class="top-bar">吉物敗家小幫手</div>
+
 <div class="header-fixed">
 <div class="page-tabs-wrapper"><div class="nav-arrow" onclick="tabScroll.scrollBy(-180,0)">❮</div><div class="scroll-container" id="tab-scroll"><div class="page-tabs" id="page-tabs"></div></div><div class="nav-arrow" onclick="tabScroll.scrollBy(180,0)">❯</div></div>
 <div class="nav-bar-wrapper"><div class="nav-arrow" onclick="roleScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="role-scroll"><div class="nav-bar" id="dynamic-nav"></div></div><div class="nav-arrow" onclick="roleScroll.scrollBy(150,0)">❯</div></div>
@@ -49,6 +50,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 </div>
 
 <div id="card-container"><div id="items-wrapper"></div></div>
+
 <div id="cart-trigger"><img src="https://images.icon-icons.com/2098/PNG/512/shopping_cart_icon_128753.png"><div id="cart-badge">0</div></div>
 <div id="cart-overlay-bg" onclick="toggleCart(false)"></div>
 
@@ -60,7 +62,9 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 
 <div id="checkout-modal"><div class="modal-content">
 <span onclick="closeModal()" style="position:absolute;top:10px;right:15px;cursor:pointer;color:#ccc">✕</span>
-<h3 style="margin-top:0">確認訂購</h3><div class="summary-box" id="modal-summary-list"></div><div id="modal-shipping" class="shipping-box"></div>
+<h3 style="margin-top:0">確認訂購</h3>
+<div class="summary-box" id="modal-summary-list"></div>
+<div id="modal-shipping" class="shipping-box"></div>
 <div style="text-align:right;font-weight:bold;margin-bottom:10px">原價合計：<span id="modal-total-price">¥0</span></div>
 <button class="btn-checkout" id="send-btn" onclick="handleFinalCheckout()">確認訂購</button>
 </div></div>
@@ -69,7 +73,8 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",FREE_SHIPPING=11000,IMG="https://i.postimg.cc/bv5xRs04/image.png";
 const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop"},ALLOWED=Object.values(SITES);
 const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
-const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"最新開團"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
+const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
+
 let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
@@ -80,7 +85,10 @@ function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"
 function yen(v){const n=Number(String(v||"").replace(/[^\d.-]/g,""));return Number.isFinite(n)?n:0}
 function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
-function renderTabs(){document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("")}
+
+function renderTabs(){
+document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("");
+}
 
 async function getSheet(sheet){
 if(sheetCache[sheet])return sheetCache[sheet];
@@ -91,7 +99,7 @@ return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.
 }
 
 function findStock(item,stock){
-if(item.sn){const s=stock.find(x=>x.sn&&String(x.sn).trim()===String(item.sn).trim());if(s)return s}
+if(item.sn)return stock.find(x=>x.sn&&String(x.sn).trim()===String(item.sn).trim())||null;
 return stock.find(x=>String(x.role).trim()===String(item.role).trim()&&String(x.name).trim()===String(item.name).trim())||null;
 }
 
@@ -107,107 +115,387 @@ return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(
 }
 
 async function switchTab(key){
-currentTab=key;selectedTypes=[];selectedRole=null;renderTabs();document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
+currentTab=key;selectedTypes=[];selectedRole=null;renderTabs();
+
+const fw=document.querySelector(".filter-bar-wrapper");
+fw.style.display=key==="pending"?"none":"flex";
+document.getElementById("card-container").style.paddingTop=key==="pending"?"128px":"158px";
+
+document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
+
 try{
-let rows=await getSheet(TABS[key].sheet);
+let rows=await getSheet(TABS[key].sheet),stock;
 
 if(key==="pending"){
-const stock=await getSheet("商品庫存");
-rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock,true)).filter(i=>ALLOWED.includes(originOf(i.url)));
+stock=await getSheet("商品庫存");
+rows=rows
+.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group))
+.map(i=>mergeStock(i,stock,true))
+.filter(i=>ALLOWED.includes(originOf(i.url)));
 }else if(key==="latest"){
-const stock=await getSheet("商品庫存");
-rows=rows.filter(i=>i.name&&i.sn&&i.url&&!MAIN_GROUPS.includes(i.group)&&ALLOWED.includes(originOf(i.url))).map(i=>mergeStock(i,stock,false));
-}else rows=filterNormal(rows,key);
-
-allItems=rows.map(i=>({...i,displayName:i.displayName||i.name,category:key==="latest"?(i.group||"其他"):(i.role||i.ip||i.group||"其他"),type:i.type||"其他"}));
-allCategories=[...new Set(allItems.map(i=>i.category).filter(Boolean))];allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
-renderRoleNav();renderFilters();renderItems();
-}catch(e){console.error(e);document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>"}
+stock=await getSheet("商品庫存");
+rows=rows
+.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
+.map(i=>mergeStock(i,stock,true));
+}else{
+rows=filterNormal(rows,key);
 }
 
-function renderRoleNav(){document.getElementById("dynamic-nav").innerHTML=allCategories.map(c=>`<a class="${selectedRole===c?"active-role":""}" onclick='toggleRole(${JSON.stringify(c)})'>${c}</a>`).join("")}
-function toggleRole(c){selectedRole=selectedRole===c?null:c;scrollTo({top:0,behavior:"smooth"});renderRoleNav();renderItems()}
-function renderFilters(){document.getElementById("filter-bar").innerHTML=allTypes.map(t=>`<label class="filter-item ${selectedTypes.includes(t)?"active":""}"><input type="checkbox" ${selectedTypes.includes(t)?"checked":""} onchange='toggleType(${JSON.stringify(t)})'>${t}</label>`).join("")}
-function toggleType(t){selectedTypes=selectedTypes.includes(t)?selectedTypes.filter(x=>x!==t):[...selectedTypes,t];renderFilters();renderItems()}
+allItems=rows.map(i=>({
+...i,
+displayName:i.displayName||i.name,
+category:key==="pending"
+?siteName(originOf(i.url))
+:key==="latest"
+?(i.group||"其他")
+:(i.role||i.ip||i.group||"其他"),
+type:i.type||"其他"
+}));
+
+allCategories=[...new Set(allItems.map(i=>i.category).filter(Boolean))];
+allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
+
+renderRoleNav();
+
+if(key==="pending"){
+document.getElementById("filter-bar").innerHTML="";
+}else{
+renderFilters();
+}
+
+renderItems();
+
+}catch(e){
+console.error(e);
+document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>";
+}
+}
+
+function renderRoleNav(){
+document.getElementById("dynamic-nav").innerHTML=allCategories.map(c=>`<a class="${selectedRole===c?"active-role":""}" onclick='toggleRole(${JSON.stringify(c)})'>${c}</a>`).join("");
+}
+
+function toggleRole(c){
+selectedRole=selectedRole===c?null:c;
+scrollTo({top:0,behavior:"smooth"});
+renderRoleNav();
+renderItems();
+}
+
+function renderFilters(){
+document.getElementById("filter-bar").innerHTML=allTypes.map(t=>`<label class="filter-item ${selectedTypes.includes(t)?"active":""}"><input type="checkbox" ${selectedTypes.includes(t)?"checked":""} onchange='toggleType(${JSON.stringify(t)})'>${t}</label>`).join("");
+}
+
+function toggleType(t){
+selectedTypes=selectedTypes.includes(t)?selectedTypes.filter(x=>x!==t):[...selectedTypes,t];
+renderFilters();
+renderItems();
+}
 
 function renderItems(){
-const box=document.getElementById("items-wrapper");box.innerHTML="";let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;if(selectedRole)items=items.filter(i=>i.category===selectedRole);
-if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
-if(!selectedTypes.length&&!selectedRole)allCategories.forEach(c=>{const a=items.filter(i=>i.category===c);if(!a.length)return;const d=document.createElement("div");d.className="type-divider";d.textContent=c;box.appendChild(d);const g=document.createElement("div");g.className="group-grid";a.forEach(i=>g.appendChild(createCard(i)));box.appendChild(g)});
-else{const g=document.createElement("div");g.className="group-grid";g.style.paddingTop="10px";items.forEach(i=>g.appendChild(createCard(i)));box.appendChild(g)}
+const box=document.getElementById("items-wrapper");
+box.innerHTML="";
+
+let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;
+if(selectedRole)items=items.filter(i=>i.category===selectedRole);
+
+if(!items.length){
+box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";
+return;
+}
+
+if(!selectedTypes.length&&!selectedRole){
+allCategories.forEach(c=>{
+const a=items.filter(i=>i.category===c);
+if(!a.length)return;
+
+const d=document.createElement("div");
+d.className="type-divider";
+d.textContent=c;
+box.appendChild(d);
+
+const g=document.createElement("div");
+g.className="group-grid";
+a.forEach(i=>g.appendChild(createCard(i)));
+box.appendChild(g);
+});
+}else{
+const g=document.createElement("div");
+g.className="group-grid";
+g.style.paddingTop="10px";
+items.forEach(i=>g.appendChild(createCard(i)));
+box.appendChild(g);
+}
 }
 
 function createCard(item){
-const c=document.createElement("div");c.className="card";
+const c=document.createElement("div");
+c.className="card";
 c.innerHTML=`<div class="add-btn-tag">＋</div><img src="${item.img||IMG}"><div class="name">${formatName(item.displayName)}</div><div class="price">${priceText(item.originalPrice)}</div><div class="size">${item.size||""}</div>`;
-c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);c.onclick=()=>zoomCard(c);return c;
+c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);
+c.onclick=()=>zoomCard(c);
+return c;
 }
 
-function formatName(n){if(!n)return"";return n.includes(" ")?n.split(" ").join("<br>"):n.length>9?n.slice(0,9)+"<br>"+n.slice(9):n}
-function zoomCard(c){const o=document.createElement("div");o.className="card-overlay";o.appendChild(c.cloneNode(true));o.onclick=()=>o.remove();document.body.appendChild(o)}
+function formatName(n){
+if(!n)return"";
+return n.includes(" ")?n.split(" ").join("<br>"):n.length>9?n.slice(0,9)+"<br>"+n.slice(9):n;
+}
+
+function zoomCard(c){
+const o=document.createElement("div");
+o.className="card-overlay";
+o.appendChild(c.cloneNode(true));
+o.onclick=()=>o.remove();
+document.body.appendChild(o);
+}
+
 function saveCart(){localStorage.setItem("jiwu_helper_cart",JSON.stringify(cart))}
-function addToCart(e,item){e.stopPropagation();cart.push(item);saveCart();updateCartUI();e.currentTarget.style.opacity=.4;setTimeout(()=>e.currentTarget.style.opacity=1,120)}
-function removeFromCart(i){cart.splice(i,1);saveCart();updateCartUI();if(document.getElementById("checkout-modal").style.display==="flex")renderCheckoutSummary()}
-function clearCart(){if(confirm("確定要清空購物車嗎？")){cart=[];saveCart();updateCartUI()}}
-function toggleCart(v){document.getElementById("cart-panel").classList.toggle("open",v);document.getElementById("cart-overlay-bg").style.display=v?"block":"none"}
+
+function addToCart(e,item){
+e.stopPropagation();
+cart.push(item);
+saveCart();
+updateCartUI();
+e.currentTarget.style.opacity=.4;
+setTimeout(()=>e.currentTarget.style.opacity=1,120);
+}
+
+function removeFromCart(i){
+cart.splice(i,1);
+saveCart();
+updateCartUI();
+if(document.getElementById("checkout-modal").style.display==="flex")renderCheckoutSummary();
+}
+
+function clearCart(){
+if(confirm("確定要清空購物車嗎？")){
+cart=[];
+saveCart();
+updateCartUI();
+}
+}
+
+function toggleCart(v){
+document.getElementById("cart-panel").classList.toggle("open",v);
+document.getElementById("cart-overlay-bg").style.display=v?"block":"none";
+}
 
 function cartInfo(){
-const groups={};let total=0;
-cart.forEach(i=>{const o=originOf(i.url)||"未知官網",p=yen(i.originalPrice);total+=p;if(!groups[o])groups[o]={total:0,missing:0};groups[o].total+=p;if(!p)groups[o].missing++});
+const groups={};
+let total=0;
+
+cart.forEach(i=>{
+const o=originOf(i.url)||"未知官網",p=yen(i.originalPrice);
+total+=p;
+
+if(!groups[o])groups[o]={total:0,missing:0};
+
+groups[o].total+=p;
+if(!p)groups[o].missing++;
+});
+
 return{groups,total};
 }
 
 function shippingHtml(){
-const {groups}=cartInfo();if(!Object.keys(groups).length)return"尚未加入商品";
-return Object.entries(groups).map(([o,g])=>{const d=Math.max(0,FREE_SHIPPING-g.total),warn=g.missing?` <span style="color:#aaa">(${g.missing}件無原價)</span>`:"";return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br>${d?`還差 <b>¥${fmt(d)}</b> 免運`:`<b>✓ 已達免運</b>`}${warn}</div>`}).join("<hr style='border:0;border-top:1px solid #eee'>");
+const {groups}=cartInfo();
+
+if(!Object.keys(groups).length)return"尚未加入商品";
+
+return Object.entries(groups).map(([o,g])=>{
+const d=Math.max(0,FREE_SHIPPING-g.total);
+const warn=g.missing?` <span style="color:#aaa">(${g.missing}件無原價)</span>`:"";
+
+return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br>${d?`還差 <b>¥${fmt(d)}</b> 免運`:`<b>✓ 已達免運</b>`}${warn}</div>`;
+}).join("<hr style='border:0;border-top:1px solid #eee'>");
 }
 
 function updateCartUI(){
-document.getElementById("cart-list").innerHTML=cart.map((i,n)=>`<div class="cart-item"><img src="${i.img||IMG}"><div class="cart-item-info"><div style="font-weight:bold">${i.displayName||i.name}</div><div style="color:#718596;font-weight:bold">${priceText(i.originalPrice)}</div></div><span style="cursor:pointer;color:#ccc;padding:5px" onclick="removeFromCart(${n})">✕</span></div>`).join("");
-const b=document.getElementById("cart-badge"),x=cartInfo();b.textContent=cart.length;b.style.display=cart.length?"flex":"none";document.getElementById("cart-total").textContent=`¥${fmt(x.total)}`;document.getElementById("shipping-progress").innerHTML=shippingHtml();
+document.getElementById("cart-list").innerHTML=cart.map((i,n)=>`
+<div class="cart-item">
+<img src="${i.img||IMG}">
+<div class="cart-item-info">
+<div style="font-weight:bold">${i.displayName||i.name}</div>
+<div style="color:#718596;font-weight:bold">${priceText(i.originalPrice)}</div>
+</div>
+<span style="cursor:pointer;color:#ccc;padding:5px" onclick="removeFromCart(${n})">✕</span>
+</div>`).join("");
+
+const b=document.getElementById("cart-badge"),x=cartInfo();
+b.textContent=cart.length;
+b.style.display=cart.length?"flex":"none";
+document.getElementById("cart-total").textContent=`¥${fmt(x.total)}`;
+document.getElementById("shipping-progress").innerHTML=shippingHtml();
 }
 
-function openCheckoutModal(){if(!cart.length)return alert("購物車是空的唷！");toggleCart(false);renderCheckoutSummary();document.getElementById("checkout-modal").style.display="flex"}
-function closeModal(){document.getElementById("checkout-modal").style.display="none"}
+function openCheckoutModal(){
+if(!cart.length)return alert("購物車是空的唷！");
+toggleCart(false);
+renderCheckoutSummary();
+document.getElementById("checkout-modal").style.display="flex";
+}
+
+function closeModal(){
+document.getElementById("checkout-modal").style.display="none";
+}
+
 function renderCheckoutSummary(){
-document.getElementById("modal-summary-list").innerHTML=cart.map(i=>`<div class="cart-item"><img src="${i.img||IMG}"><div class="cart-item-info"><div style="font-weight:bold">${i.displayName||i.name}</div><div style="color:#718596;font-weight:bold">${priceText(i.originalPrice)}</div></div></div>`).join("");
-document.getElementById("modal-total-price").textContent=`¥${fmt(cartInfo().total)}`;document.getElementById("modal-shipping").innerHTML=shippingHtml();
+document.getElementById("modal-summary-list").innerHTML=cart.map(i=>`
+<div class="cart-item">
+<img src="${i.img||IMG}">
+<div class="cart-item-info">
+<div style="font-weight:bold">${i.displayName||i.name}</div>
+<div style="color:#718596;font-weight:bold">${priceText(i.originalPrice)}</div>
+</div>
+</div>`).join("");
+
+document.getElementById("modal-total-price").textContent=`¥${fmt(cartInfo().total)}`;
+document.getElementById("modal-shipping").innerHTML=shippingHtml();
 }
 
 async function getVariantId(item){
-if(!item.url)throw new Error(`${item.name} 沒有商品網址`);if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
-const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);if(!m)throw new Error(`${item.name} 商品網址無法辨識`);
-const r=await fetch(`${u.origin}/products/${m[1]}.js`);if(!r.ok)throw new Error(`${item.name} 無法讀取商品資料`);
-const p=await r.json(),v=(p.variants||[]).find(x=>String(x.sku||"").trim()===String(item.sn).trim());
-if(!v?.id)throw new Error(`${item.name} 找不到貨號 ${item.sn}`);return String(v.id);
+if(!item.url)throw new Error(`${item.name} 沒有商品網址`);
+if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
+
+const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
+
+if(!m)throw new Error(`${item.name} 商品網址無法辨識`);
+
+const r=await fetch(`${u.origin}/products/${m[1]}.js`);
+
+if(!r.ok)throw new Error(`${item.name} 無法讀取商品資料`);
+
+const p=await r.json();
+const v=(p.variants||[]).find(x=>String(x.sku||"").trim()===String(item.sn).trim());
+
+if(!v?.id)throw new Error(`${item.name} 找不到貨號 ${item.sn}`);
+
+return String(v.id);
 }
 
 async function makeCartUrl(origin,items){
-const ids=await Promise.all(items.map(getVariantId)),qty={};ids.forEach(id=>qty[id]=(qty[id]||0)+1);
+const ids=await Promise.all(items.map(getVariantId)),qty={};
+
+ids.forEach(id=>qty[id]=(qty[id]||0)+1);
+
 return `${origin}/cart/${Object.entries(qty).map(([id,n])=>`${id}:${n}`).join(",")}`;
 }
 
 async function handleFinalCheckout(){
-const btn=document.getElementById("send-btn");btn.disabled=true;btn.textContent="正在加入官網購物車...";let opened=[];
+const btn=document.getElementById("send-btn");
+btn.disabled=true;
+btn.textContent="正在加入官網購物車...";
+
+let opened=[];
+
 try{
 if(cart.some(i=>!i.url||!i.sn))throw new Error("有商品沒有貨號或商品網址");
-const groups={};cart.forEach(i=>{const o=originOf(i.url);if(!o)throw new Error(`${i.name} 商品網址錯誤`);(groups[o]??=[]).push(i)});
+
+const groups={};
+
+cart.forEach(i=>{
+const o=originOf(i.url);
+
+if(!o)throw new Error(`${i.name} 商品網址錯誤`);
+
+(groups[o]??=[]).push(i);
+});
+
 const origins=Object.keys(groups);
-for(const o of origins.slice(1)){const w=window.open("about:blank","_blank");if(!w)throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗");opened.push({o,w})}
-const urls={};for(const o of origins)urls[o]=await makeCartUrl(o,groups[o]);
-opened.forEach(x=>x.w.location.href=urls[x.o]);cart=[];saveCart();location.href=urls[origins[0]];
-}catch(e){opened.forEach(x=>{try{x.w.close()}catch{}});console.error(e);alert(e.message);btn.disabled=false;btn.textContent="確認訂購"}
+
+for(const o of origins.slice(1)){
+const w=window.open("about:blank","_blank");
+
+if(!w)throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗");
+
+opened.push({o,w});
+}
+
+const urls={};
+
+for(const o of origins){
+urls[o]=await makeCartUrl(o,groups[o]);
+}
+
+opened.forEach(x=>x.w.location.href=urls[x.o]);
+
+cart=[];
+saveCart();
+
+location.href=urls[origins[0]];
+
+}catch(e){
+opened.forEach(x=>{
+try{x.w.close()}catch{}
+});
+
+console.error(e);
+alert(e.message);
+
+btn.disabled=false;
+btn.textContent="確認訂購";
+}
 }
 
 (function(){
-const el=document.getElementById("cart-trigger");let drag=false,sx,sy,ix,iy;
-function start(e){drag=false;const p=e.touches?e.touches[0]:e,r=el.getBoundingClientRect();sx=p.clientX;sy=p.clientY;ix=r.left;iy=r.top;document.addEventListener("mousemove",move);document.addEventListener("touchmove",move,{passive:false});document.addEventListener("mouseup",end);document.addEventListener("touchend",end)}
-function move(e){const p=e.touches?e.touches[0]:e,dx=p.clientX-sx,dy=p.clientY-sy;if(Math.abs(dx)>5||Math.abs(dy)>5){drag=true;if(e.cancelable)e.preventDefault();el.style.left=ix+dx+"px";el.style.top=iy+dy+"px";el.style.right="auto"}}
-function end(){document.removeEventListener("mousemove",move);document.removeEventListener("touchmove",move);document.removeEventListener("mouseup",end);document.removeEventListener("touchend",end);if(drag){const r=el.getBoundingClientRect();el.style.left=(r.left+r.width/2<innerWidth/2?10:innerWidth-r.width-10)+"px";el.style.top=Math.max(50,Math.min(r.top,innerHeight-60))+"px"}}
-el.onclick=e=>drag?e.preventDefault():toggleCart(true);el.addEventListener("mousedown",start);el.addEventListener("touchstart",start,{passive:false});
+const el=document.getElementById("cart-trigger");
+let drag=false,sx,sy,ix,iy;
+
+function start(e){
+drag=false;
+
+const p=e.touches?e.touches[0]:e,r=el.getBoundingClientRect();
+
+sx=p.clientX;
+sy=p.clientY;
+ix=r.left;
+iy=r.top;
+
+document.addEventListener("mousemove",move);
+document.addEventListener("touchmove",move,{passive:false});
+document.addEventListener("mouseup",end);
+document.addEventListener("touchend",end);
+}
+
+function move(e){
+const p=e.touches?e.touches[0]:e,dx=p.clientX-sx,dy=p.clientY-sy;
+
+if(Math.abs(dx)>5||Math.abs(dy)>5){
+drag=true;
+
+if(e.cancelable)e.preventDefault();
+
+el.style.left=ix+dx+"px";
+el.style.top=iy+dy+"px";
+el.style.right="auto";
+}
+}
+
+function end(){
+document.removeEventListener("mousemove",move);
+document.removeEventListener("touchmove",move);
+document.removeEventListener("mouseup",end);
+document.removeEventListener("touchend",end);
+
+if(drag){
+const r=el.getBoundingClientRect();
+
+el.style.left=(r.left+r.width/2<innerWidth/2?10:innerWidth-r.width-10)+"px";
+el.style.top=Math.max(50,Math.min(r.top,innerHeight-60))+"px";
+}
+}
+
+el.onclick=e=>drag?e.preventDefault():toggleCart(true);
+el.addEventListener("mousedown",start);
+el.addEventListener("touchstart",start,{passive:false});
 })();
 
-window.onload=()=>{renderTabs();updateCartUI();switchTab("pending")};
+window.onload=()=>{
+renderTabs();
+updateCartUI();
+switchTab("pending");
+};
 </script>
 </body>
 </html>

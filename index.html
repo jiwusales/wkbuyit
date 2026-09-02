@@ -49,7 +49,6 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 </div>
 
 <div id="card-container"><div id="items-wrapper"></div></div>
-
 <div id="cart-trigger"><img src="https://images.icon-icons.com/2098/PNG/512/shopping_cart_icon_128753.png"><div id="cart-badge">0</div></div>
 <div id="cart-overlay-bg" onclick="toggleCart(false)"></div>
 
@@ -61,8 +60,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 
 <div id="checkout-modal"><div class="modal-content">
 <span onclick="closeModal()" style="position:absolute;top:10px;right:15px;cursor:pointer;color:#ccc">✕</span>
-<h3 style="margin-top:0">確認訂購</h3><div class="summary-box" id="modal-summary-list"></div>
-<div id="modal-shipping" class="shipping-box"></div>
+<h3 style="margin-top:0">確認訂購</h3><div class="summary-box" id="modal-summary-list"></div><div id="modal-shipping" class="shipping-box"></div>
 <div style="text-align:right;font-weight:bold;margin-bottom:10px">原價合計：<span id="modal-total-price">¥0</span></div>
 <button class="btn-checkout" id="send-btn" onclick="handleFinalCheckout()">確認訂購</button>
 </div></div>
@@ -70,7 +68,8 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 <script>
 const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",FREE_SHIPPING=11000,IMG="https://i.postimg.cc/bv5xRs04/image.png";
 const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop"},ALLOWED=Object.values(SITES);
-const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"},latest:{label:"最新開團",sheet:"最新開團"}};
+const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
+const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"最新開團"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
@@ -81,7 +80,6 @@ function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"
 function yen(v){const n=Number(String(v||"").replace(/[^\d.-]/g,""));return Number.isFinite(n)?n:0}
 function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
-
 function renderTabs(){document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("")}
 
 async function getSheet(sheet){
@@ -94,21 +92,18 @@ return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.
 
 function findStock(item,stock){
 if(item.sn){const s=stock.find(x=>x.sn&&String(x.sn).trim()===String(item.sn).trim());if(s)return s}
-if(!item.sn)return stock.find(x=>String(x.role).trim()===String(item.role).trim()&&String(x.name).trim()===String(item.name).trim());
-return null;
+return stock.find(x=>String(x.role).trim()===String(item.role).trim()&&String(x.name).trim()===String(item.name).trim())||null;
 }
 
-function mergePending(item,stock){
-const s=findStock(item,stock);
-if(!s)return {...item,displayName:`${item.source||""}${item.customer||""}${item.source||item.customer?" ":""}${item.name}`};
-return {...item,ip:item.ip||s.ip,role:item.role||s.role,type:item.type||s.type,img:s.img||item.img,url:item.url||s.url,size:item.size||s.size,originalPrice:s.originalPrice||"",sn:item.sn||s.sn,displayName:`${item.source||""}${item.customer||""}${item.source||item.customer?" ":""}${item.name}`};
+function mergeStock(item,stock,showBuyer=false){
+const s=findStock(item,stock),prefix=showBuyer&&((item.source||"")+(item.customer||""))?`${item.source||""}${item.customer||""} `:"";
+return {...item,ip:item.ip||s?.ip||"",role:item.role||s?.role||"",type:item.type||s?.type||"",img:s?.img||item.img,url:item.url||s?.url||"",size:item.size||s?.size||"",sn:item.sn||s?.sn||"",originalPrice:s?.originalPrice||"",displayName:prefix+item.name};
 }
 
 function filterNormal(rows,key){
 if(key==="chiikawa")return rows.filter(i=>i.name&&i.colStock==="0"&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
 if(key==="nagano")return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ナガノ"&&originOf(i.url)===SITES.nagano);
-if(key==="mogu")return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(i.url)===SITES.mogu);
-return rows.filter(i=>i.name&&i.sn&&i.url&&ALLOWED.includes(originOf(i.url)));
+return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(i.url)===SITES.mogu);
 }
 
 async function switchTab(key){
@@ -118,14 +113,14 @@ let rows=await getSheet(TABS[key].sheet);
 
 if(key==="pending"){
 const stock=await getSheet("商品庫存");
-rows=rows.filter(i=>i.name&&i.status==="未訂購").map(i=>mergePending(i,stock)).filter(i=>ALLOWED.includes(originOf(i.url)));
+rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock,true)).filter(i=>ALLOWED.includes(originOf(i.url)));
 }else if(key==="latest"){
-rows=filterNormal(rows,key);
+const stock=await getSheet("商品庫存");
+rows=rows.filter(i=>i.name&&i.sn&&i.url&&!MAIN_GROUPS.includes(i.group)&&ALLOWED.includes(originOf(i.url))).map(i=>mergeStock(i,stock,false));
 }else rows=filterNormal(rows,key);
 
-allItems=rows.map(i=>({...i,displayName:i.displayName||i.name,category:key==="latest"?(i.group||"其他"):(i.role||i.ip||"其他"),type:i.type||"其他"}));
-allCategories=[...new Set(allItems.map(i=>i.category).filter(Boolean))];
-allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
+allItems=rows.map(i=>({...i,displayName:i.displayName||i.name,category:key==="latest"?(i.group||"其他"):(i.role||i.ip||i.group||"其他"),type:i.type||"其他"}));
+allCategories=[...new Set(allItems.map(i=>i.category).filter(Boolean))];allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
 renderRoleNav();renderFilters();renderItems();
 }catch(e){console.error(e);document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>"}
 }
@@ -174,7 +169,6 @@ const b=document.getElementById("cart-badge"),x=cartInfo();b.textContent=cart.le
 
 function openCheckoutModal(){if(!cart.length)return alert("購物車是空的唷！");toggleCart(false);renderCheckoutSummary();document.getElementById("checkout-modal").style.display="flex"}
 function closeModal(){document.getElementById("checkout-modal").style.display="none"}
-
 function renderCheckoutSummary(){
 document.getElementById("modal-summary-list").innerHTML=cart.map(i=>`<div class="cart-item"><img src="${i.img||IMG}"><div class="cart-item-info"><div style="font-weight:bold">${i.displayName||i.name}</div><div style="color:#718596;font-weight:bold">${priceText(i.originalPrice)}</div></div></div>`).join("");
 document.getElementById("modal-total-price").textContent=`¥${fmt(cartInfo().total)}`;document.getElementById("modal-shipping").innerHTML=shippingHtml();

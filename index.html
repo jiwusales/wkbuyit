@@ -1,143 +1,118 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>吉物敗家小幫手</title>
 <link rel="icon" href="https://i.postimg.cc/3R7nNT0k/icon.png" type="image/png">
 
 <style>
-:root{--theme:#C3D2DE;--active:#718596;--text:#333}
-*{box-sizing:border-box}
+:root{--theme:#C3D2DE;--active:#718596;--text:#333}*{box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);text-align:center;overflow-x:hidden}
 .top-bar{position:fixed;top:0;left:0;width:100%;height:40px;background:var(--theme);color:#fff;z-index:999;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:bold}
-.menu-btn{position:absolute;left:15px;font-size:20px;cursor:pointer}
 .header-fixed{position:fixed;top:40px;width:100%;background:#fff;z-index:998;border-bottom:1px solid #eee}
-.nav-bar-wrapper,.filter-bar-wrapper{display:flex;align-items:center;padding:0 5px}
-.nav-bar-wrapper{height:38px;border-bottom:1px solid #f0f0f0}.filter-bar-wrapper{height:30px}
+.page-tabs-wrapper,.nav-bar-wrapper,.filter-bar-wrapper{display:flex;align-items:center;padding:0 5px}
+.page-tabs-wrapper{height:40px;border-bottom:1px solid #eee}.nav-bar-wrapper{height:38px;border-bottom:1px solid #f0f0f0}.filter-bar-wrapper{height:30px}
 .scroll-container{flex:1;overflow-x:auto;white-space:nowrap;scrollbar-width:none}.scroll-container::-webkit-scrollbar{display:none}
-.nav-bar{display:inline-block;padding:8px 0;font-size:10pt}
-.nav-bar a{color:var(--text);text-decoration:none;padding:6px 0;display:inline-block;cursor:pointer}
-.nav-bar a.active-role,.filter-item.active{font-weight:bold;color:var(--active)}
-.nav-bar a::after{content:"｜";color:#aaa;margin:0 2px}.nav-bar a:last-child::after{content:""}
-.filter-item{display:inline-flex;align-items:center;margin:0 4px;font-size:12px;cursor:pointer;color:#666}
-.filter-item input{margin-right:3px;accent-color:var(--theme);transform:scale(.8)}
+.page-tabs{display:inline-flex;gap:5px;padding:4px 0}.page-tab{border:0;background:#f3f3f3;color:#666;padding:7px 12px;border-radius:8px;font-size:12px;white-space:nowrap;cursor:pointer}.page-tab.active{background:var(--theme);color:#fff;font-weight:bold}
+.nav-bar{display:inline-block;padding:8px 0;font-size:10pt}.nav-bar a{color:var(--text);text-decoration:none;padding:6px 0;display:inline-block;cursor:pointer}
+.nav-bar a.active-role,.filter-item.active{font-weight:bold;color:var(--active)}.nav-bar a::after{content:"｜";color:#aaa;margin:0 2px}.nav-bar a:last-child::after{content:""}
+.filter-item{display:inline-flex;align-items:center;margin:0 4px;font-size:12px;cursor:pointer;color:#666}.filter-item input{margin-right:3px;accent-color:var(--theme);transform:scale(.8)}
 .nav-arrow{width:24px;font-size:16px;cursor:pointer;flex-shrink:0;color:#bbb}
-#card-container{padding:108px 10px 10px;display:flex;flex-direction:column;gap:8px}
-#banner-wrapper{width:720px;max-width:100%;margin:auto}#banner-wrapper img{width:100%;display:block;margin:0 auto 4px}
-.type-divider{display:flex;align-items:center;justify-content:center;margin:15px 0 8px;font-weight:bold;font-size:16px}
-.type-divider::before,.type-divider::after{content:"";flex:1;border-top:1px solid #ddd;margin:0 10px}
-.group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
+#card-container{padding:158px 10px 10px;display:flex;flex-direction:column;gap:8px}
+.type-divider{display:flex;align-items:center;justify-content:center;margin:15px 0 8px;font-weight:bold;font-size:16px}.type-divider::before,.type-divider::after{content:"";flex:1;border-top:1px solid #ddd;margin:0 10px}
+.group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10;cursor:pointer}
 .card img{height:90px;width:auto;max-width:90%;display:block;margin:5px auto 0;object-fit:contain;pointer-events:none}
-.card .name{margin:1px auto;font-size:9px;font-weight:bold;line-height:1.2;padding:0 2px}
-.card .price{font-size:10px;margin:1px auto;color:var(--active)}.card .size{font-size:8px;margin:0 auto 5px;color:#888}
-.card-overlay{position:fixed;inset:0;background:#000b;z-index:10000;display:flex;justify-content:center;align-items:center;cursor:pointer}
-.card-overlay .card{transform:scale(3.1);width:100px;padding:15px 0 5px;pointer-events:none}
-#side-menu{position:fixed;top:0;left:-250px;width:220px;height:100%;background:#fff;z-index:10001;transition:.3s;box-shadow:2px 0 10px #0002;text-align:left}
-#side-menu.open{left:0}.menu-header{padding:10px;background:var(--theme);color:#fff;font-weight:bold;display:flex;align-items:center;text-decoration:none}
-.header-icon{width:28px;height:28px;object-fit:contain;margin-right:10px}
-.menu-item{padding:12px 20px;border-bottom:1px solid #f0f0f0;color:#555;text-decoration:none;display:flex;align-items:center;gap:10px;font-size:14px}
-.menu-item img{width:36px;height:36px;object-fit:contain}
-#menu-overlay,#cart-overlay-bg{position:fixed;inset:0;background:#0006;display:none}#menu-overlay{z-index:10000}#cart-overlay-bg{z-index:1000}
-#cart-trigger{position:fixed;top:115px;right:15px;width:45px;height:45px;background:#fff;border-radius:50%;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 8px #0003;z-index:999;opacity:.85;cursor:move;touch-action:none;user-select:none}
+.card .name{margin:1px auto;font-size:9px;font-weight:bold;line-height:1.2;padding:0 2px}.card .price{font-size:10px;margin:1px auto;color:var(--active)}.card .size{font-size:8px;margin:0 auto 5px;color:#888}
+.card-overlay{position:fixed;inset:0;background:#000b;z-index:10000;display:flex;justify-content:center;align-items:center;cursor:pointer}.card-overlay .card{transform:scale(3.1);width:100px;padding:15px 0 5px;pointer-events:none}
+#cart-overlay-bg{position:fixed;inset:0;background:#0006;display:none;z-index:1000}
+#cart-trigger{position:fixed;top:155px;right:15px;width:45px;height:45px;background:#fff;border-radius:50%;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 8px #0003;z-index:999;opacity:.85;cursor:move;touch-action:none;user-select:none}
 #cart-trigger img{width:28px;height:28px;pointer-events:none}
 #cart-badge{position:absolute;top:-2px;right:-2px;background:#ff4d4f;color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:bold}
-#cart-panel{position:fixed;top:0;right:-300px;width:280px;height:100%;background:#fff;box-shadow:-5px 0 15px #0002;z-index:1001;transition:.3s;display:flex;flex-direction:column}
-#cart-panel.open{right:0}
+#cart-panel{position:fixed;top:0;right:-300px;width:280px;height:100%;background:#fff;box-shadow:-5px 0 15px #0002;z-index:1001;transition:.3s;display:flex;flex-direction:column}#cart-panel.open{right:0}
 .cart-header{padding:12px 15px;background:var(--theme);color:#fff;font-weight:bold;font-size:16px;text-align:left;display:flex;justify-content:space-between}
-.cart-list{flex:1;overflow-y:auto;padding:10px;text-align:left}
-.cart-item{display:flex;align-items:center;gap:10px;margin-bottom:12px;border-bottom:1px solid #f0f0f0;padding-bottom:8px;font-size:12px}
+.cart-list{flex:1;overflow-y:auto;padding:10px;text-align:left}.cart-item{display:flex;align-items:center;gap:10px;margin-bottom:12px;border-bottom:1px solid #f0f0f0;padding-bottom:8px;font-size:12px}
 .cart-item img{width:45px;height:45px;object-fit:contain;border-radius:4px}.cart-item-info{flex:1}
-.cart-footer{padding:15px 15px 25px;border-top:1px solid #eee;background:#fafafa}
-.text-clear{display:block;text-align:left;color:#aaa;font-size:13px;text-decoration:underline;cursor:pointer;margin-bottom:12px}
+.cart-footer{padding:15px 15px 25px;border-top:1px solid #eee;background:#fafafa}.text-clear{display:block;text-align:left;color:#aaa;font-size:13px;text-decoration:underline;cursor:pointer;margin-bottom:12px}
 .btn-checkout{background:var(--theme);color:#fff;border:0;padding:12px;width:100%;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px}
 #checkout-modal{position:fixed;inset:0;background:#000c;z-index:2000;display:none;align-items:center;justify-content:center}
-.modal-content{background:#fff;width:85%;max-width:380px;border-radius:15px;padding:20px;position:relative}
-.summary-box{background:#f9f9f9;padding:10px;border-radius:5px;font-size:12px;max-height:280px;overflow-y:auto;text-align:left;margin-bottom:10px;border:1px solid #eee}
+.modal-content{background:#fff;width:85%;max-width:380px;border-radius:15px;padding:20px;position:relative}.summary-box{background:#f9f9f9;padding:10px;border-radius:5px;font-size:12px;max-height:280px;overflow-y:auto;text-align:left;margin-bottom:10px;border:1px solid #eee}
 </style>
 </head>
 
 <body>
 
-<div class="top-bar"><div class="menu-btn" onclick="toggleMenu(true)">☰</div><span>吉物敗家小幫手</span></div>
-
-<div id="menu-overlay" onclick="toggleMenu(false)"></div>
-<div id="side-menu">
-<a href="https://jiwusales.github.io/jiwu_menu/" class="menu-header"><img src="https://i.postimg.cc/TPBCSXmJ/she-jiaoicon-W.png" class="header-icon">JIWU．吉物販售</a>
-<div id="side-menu-items"></div>
-</div>
+<div class="top-bar">吉物敗家小幫手</div>
 
 <div class="header-fixed">
+<div class="page-tabs-wrapper"><div class="nav-arrow" onclick="tabScroll.scrollBy(-180,0)">❮</div><div class="scroll-container" id="tab-scroll"><div class="page-tabs" id="page-tabs"></div></div><div class="nav-arrow" onclick="tabScroll.scrollBy(180,0)">❯</div></div>
 <div class="nav-bar-wrapper"><div class="nav-arrow" onclick="roleScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="role-scroll"><div class="nav-bar" id="dynamic-nav"></div></div><div class="nav-arrow" onclick="roleScroll.scrollBy(150,0)">❯</div></div>
 <div class="filter-bar-wrapper"><div class="nav-arrow" onclick="filterScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="filter-scroll"><div id="filter-bar" style="display:inline-block"></div></div><div class="nav-arrow" onclick="filterScroll.scrollBy(150,0)">❯</div></div>
 </div>
 
-<div id="card-container"><div id="banner-wrapper"></div><div id="items-wrapper"></div></div>
+<div id="card-container"><div id="items-wrapper"></div></div>
+
 <div id="cart-trigger"><img src="https://images.icon-icons.com/2098/PNG/512/shopping_cart_icon_128753.png"><div id="cart-badge">0</div></div>
 <div id="cart-overlay-bg" onclick="toggleCart(false)"></div>
 
 <div id="cart-panel">
 <div class="cart-header"><span>購物車</span><span style="cursor:pointer;font-size:20px" onclick="toggleCart(false)">✕</span></div>
 <div class="cart-list" id="cart-list"></div>
-<div class="cart-footer">
-<span class="text-clear" onclick="clearCart()">清空購物車</span>
-<div style="margin-bottom:12px;font-weight:bold;display:flex;justify-content:space-between;font-size:15px"><span>總計金額</span><span id="cart-total">$0</span></div>
-<button class="btn-checkout" onclick="openCheckoutModal()">確認訂購</button>
-</div>
+<div class="cart-footer"><span class="text-clear" onclick="clearCart()">清空購物車</span><div style="margin-bottom:12px;font-weight:bold;display:flex;justify-content:space-between;font-size:15px"><span>總計金額</span><span id="cart-total">$0</span></div><button class="btn-checkout" onclick="openCheckoutModal()">確認訂購</button></div>
 </div>
 
-<div id="checkout-modal">
-<div class="modal-content">
+<div id="checkout-modal"><div class="modal-content">
 <span onclick="closeModal()" style="position:absolute;top:10px;right:15px;cursor:pointer;color:#ccc">✕</span>
 <h3 style="margin-top:0;font-size:18px">確認訂購</h3>
 <div class="summary-box" id="modal-summary-list"></div>
 <div style="padding:5px 0;border-top:1px solid #eee;margin-bottom:10px;text-align:right;font-weight:bold;font-size:14px">總計：<span id="modal-total-price">$0</span></div>
 <button class="btn-checkout" id="send-btn" onclick="handleFinalCheckout()">確認訂購</button>
-</div>
-</div>
+</div></div>
 
 <script>
-const CONFIG={IP_NAME:"ちいかわ",SHEET_ID:"10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",SHEET_NAME:"商品庫存"};
-let allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]");
-const roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
+const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ";
+const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop"};
+const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"},latest:{label:"最新開團",sheet:"最新開團"}};
 
-function toggleMenu(v){document.getElementById("side-menu").classList.toggle("open",v);document.getElementById("menu-overlay").style.display=v?"block":"none"}
+let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
+const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
-function renderSideMenu(){
-const links=[
-["吉伊卡哇","https://jiwusales.github.io/jiwu_menu/CHWBM.html","https://i.postimg.cc/MHGy2vVz/12-2025xia-ri-1.png"],
-["吉伊卡哇樂園","https://jiwusales.github.io/jiwu_menu/CParkBM.html","https://i.postimg.cc/50PqVSdK/ckwp-icon.png"],
-["Nagano白熊","https://jiwusales.github.io/jiwu_menu/NGNBM.html","https://i.postimg.cc/hP8v81NH/icon019.png"]
-];
-document.getElementById("side-menu-items").innerHTML=links.map(x=>`<a href="${x[1]}" class="menu-item"><img src="${x[2]}">${x[0]}</a>`).join("");
-}
-
+function col(labels,...names){for(const n of names){const i=labels.indexOf(n);if(i>=0)return i}return-1}
 function getV(r,i){if(i<0||!r.c||!r.c[i])return"";const c=r.c[i];return String(c.v??c.f??"").trim()}
+function originOf(u){try{return new URL(u).origin}catch{return""}}
+function sameSite(u,site){return originOf(u)===site}
 
-function loadData(){
-const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}&headers=1`;
-fetch(url).then(r=>r.text()).then(t=>{
-try{
-const data=JSON.parse(t.substr(47).slice(0,-2));
-const H={ip:"IP",role:"角色",type:"種類",name:"名稱",price:"售價",stock:"庫存",sn:"貨號",img:"圖片",url:"商品網址",size:"尺寸",note:"首圖"};
-const labels=(data.table.cols||[]).map(c=>String(c.label||"").trim()),C={};
-Object.keys(H).forEach(k=>C[k]=labels.indexOf(H[k]));
-const raw=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role)||" ",type:getV(r,C.type)||"其他",name:getV(r,C.name),price:getV(r,C.price),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img)||"https://i.postimg.cc/bv5xRs04/image.png",url:getV(r,C.url),size:getV(r,C.size),note:getV(r,C.note)}));
-const ipRows=CONFIG.IP_NAME?raw.filter(i=>i.ip===CONFIG.IP_NAME):raw;
-renderBanner(ipRows[0]?.note||"");
-allItems=raw.filter(i=>(!CONFIG.IP_NAME||!i.ip||i.ip===CONFIG.IP_NAME)&&i.name&&String(i.colStock).trim()==="0");
-allCategories=[...new Set(allItems.map(i=>i.role))];
-allTypes=[...new Set(allItems.map(i=>i.type))];
-renderSideMenu();renderRoleNav();renderFilters();renderItems();updateCartUI();
-}catch(e){console.error(e);document.getElementById("items-wrapper").textContent="載入失敗。"}
-});
+function renderTabs(){document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("")}
+
+async function getSheet(sheet){
+if(sheetCache[sheet])return sheetCache[sheet];
+const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&headers=1`;
+const t=await fetch(url).then(r=>r.text()),data=JSON.parse(t.substr(47).slice(0,-2)),labels=(data.table.cols||[]).map(c=>String(c.label||"").trim());
+const C={ip:col(labels,"IP"),role:col(labels,"角色"),type:col(labels,"種類"),name:col(labels,"名稱"),price:col(labels,"售價"),stock:col(labels,"庫存"),sn:col(labels,"貨號"),img:col(labels,"圖片","首圖"),url:col(labels,"商品網址","網址"),size:col(labels,"尺寸"),status:col(labels,"狀態"),group:col(labels,"團名")};
+return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),price:getV(r,C.price),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img)||"https://i.postimg.cc/bv5xRs04/image.png",url:getV(r,C.url),size:getV(r,C.size),status:getV(r,C.status),group:getV(r,C.group)}));
 }
 
-function renderBanner(u){document.getElementById("banner-wrapper").innerHTML=u?`<img src="${u}" alt="banner">`:""}
+function filterTab(rows,key){
+const allowed=[SITES.chiikawa,SITES.nagano,SITES.mogu];
+if(key==="pending")return rows.filter(i=>i.name&&i.status==="未訂購");
+if(key==="chiikawa")return rows.filter(i=>i.name&&i.colStock==="0"&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&sameSite(i.url,SITES.chiikawa));
+if(key==="nagano")return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ナガノ"&&sameSite(i.url,SITES.nagano));
+if(key==="mogu")return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&sameSite(i.url,SITES.mogu));
+return rows.filter(i=>i.name&&i.sn&&i.url&&allowed.includes(originOf(i.url)));
+}
+
+async function switchTab(key){
+currentTab=key;selectedTypes=[];selectedRole=null;renderTabs();
+document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
+try{
+const rows=await getSheet(TABS[key].sheet);
+allItems=filterTab(rows,key).map(i=>({...i,role:i.role||i.ip||i.group||"其他",type:i.type||"其他"}));
+allCategories=[...new Set(allItems.map(i=>i.role).filter(Boolean))];allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
+renderRoleNav();renderFilters();renderItems();
+}catch(e){console.error(e);document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>"}
+}
+
 function renderRoleNav(){document.getElementById("dynamic-nav").innerHTML=allCategories.map(c=>`<a class="${selectedRole===c?"active-role":""}" onclick='toggleRole(${JSON.stringify(c)})'>${c}</a>`).join("")}
 function toggleRole(c){selectedRole=selectedRole===c?null:c;scrollTo({top:0,behavior:"smooth"});renderRoleNav();renderItems()}
 function renderFilters(){document.getElementById("filter-bar").innerHTML=allTypes.map(t=>`<label class="filter-item ${selectedTypes.includes(t)?"active":""}"><input type="checkbox" ${selectedTypes.includes(t)?"checked":""} onchange='toggleType(${JSON.stringify(t)})'>${t}</label>`).join("")}
@@ -145,14 +120,11 @@ function toggleType(t){selectedTypes=selectedTypes.includes(t)?selectedTypes.fil
 
 function renderItems(){
 const box=document.getElementById("items-wrapper");box.innerHTML="";
-let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;
-if(selectedRole)items=items.filter(i=>i.role===selectedRole);
-if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有庫存為 0 的商品</div>";return}
+let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;if(selectedRole)items=items.filter(i=>i.role===selectedRole);
+if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
 if(!selectedTypes.length&&!selectedRole){
 allCategories.forEach(c=>{const a=items.filter(i=>i.role===c);if(!a.length)return;const d=document.createElement("div");d.className="type-divider";d.textContent=c;box.appendChild(d);const g=document.createElement("div");g.className="group-grid";a.forEach(i=>g.appendChild(createCard(i)));box.appendChild(g)});
-}else{
-const g=document.createElement("div");g.className="group-grid";g.style.paddingTop="10px";items.forEach(i=>g.appendChild(createCard(i)));box.appendChild(g);
-}
+}else{const g=document.createElement("div");g.className="group-grid";g.style.paddingTop="10px";items.forEach(i=>g.appendChild(createCard(i)));box.appendChild(g)}
 }
 
 function createCard(item){
@@ -164,6 +136,7 @@ c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);c.onclick=()=>zoomC
 function formatName(n){if(!n)return"";return n.includes(" ")?n.split(" ").join("<br>"):n.length>9?n.slice(0,9)+"<br>"+n.slice(9):n}
 function getDisplayPrice(p){p=String(p||"").trim();if(p.includes("-"))return"組合出售";if(!p)return"詢問花花";return/^\d+$/.test(p)?`$${p}`:p}
 function zoomCard(c){const o=document.createElement("div");o.className="card-overlay";o.appendChild(c.cloneNode(true));o.onclick=()=>o.remove();document.body.appendChild(o)}
+
 function saveCart(){localStorage.setItem("jiwu_helper_cart",JSON.stringify(cart))}
 function addToCart(e,item){e.stopPropagation();cart.push(item);saveCart();updateCartUI();e.currentTarget.style.opacity=.4;setTimeout(()=>e.currentTarget.style.opacity=1,120)}
 function removeFromCart(i){cart.splice(i,1);saveCart();updateCartUI();if(document.getElementById("checkout-modal").style.display==="flex")renderCheckoutSummary()}
@@ -178,7 +151,6 @@ const b=document.getElementById("cart-badge"),t=totals();b.textContent=cart.leng
 
 function openCheckoutModal(){if(!cart.length)return alert("購物車是空的唷！");toggleCart(false);renderCheckoutSummary();document.getElementById("checkout-modal").style.display="flex"}
 function closeModal(){document.getElementById("checkout-modal").style.display="none"}
-
 function renderCheckoutSummary(){
 document.getElementById("modal-summary-list").innerHTML=cart.map(i=>`<div class="cart-item"><img src="${i.img}"><div class="cart-item-info"><div style="font-weight:bold">${i.name}</div><div style="color:#718596;font-weight:bold">${getDisplayPrice(i.price)}</div></div></div>`).join("");
 const t=totals();document.getElementById("modal-total-price").textContent=`$${t.total}${t.inq?" + 詢問報價":""}`;
@@ -199,12 +171,9 @@ return String(v.id);
 async function handleFinalCheckout(){
 const btn=document.getElementById("send-btn");btn.disabled=true;btn.textContent="正在加入官網購物車...";
 try{
-if(cart.some(i=>!i.url))throw new Error("有商品沒有商品網址");
-if(cart.some(i=>!i.sn))throw new Error("有商品沒有貨號");
-const origins=[...new Set(cart.map(i=>new URL(i.url).origin))];
-if(origins.length!==1)throw new Error("一次只能加入同一個商品官網的商品");
-const ids=await Promise.all(cart.map(getVariantId)),qty={};
-ids.forEach(id=>qty[id]=(qty[id]||0)+1);
+if(cart.some(i=>!i.url||!i.sn))throw new Error("有商品沒有貨號或商品網址");
+const origins=[...new Set(cart.map(i=>originOf(i.url)))];if(origins.length!==1||!origins[0])throw new Error("一次只能加入同一個商品官網的商品");
+const ids=await Promise.all(cart.map(getVariantId)),qty={};ids.forEach(id=>qty[id]=(qty[id]||0)+1);
 const products=Object.entries(qty).map(([id,n])=>`${id}:${n}`).join(",");
 cart=[];saveCart();location.href=`${origins[0]}/cart/${products}`;
 }catch(e){console.error(e);alert(e.message);btn.disabled=false;btn.textContent="確認訂購"}
@@ -215,11 +184,10 @@ const el=document.getElementById("cart-trigger");let drag=false,sx,sy,ix,iy;
 function start(e){drag=false;const p=e.touches?e.touches[0]:e,r=el.getBoundingClientRect();sx=p.clientX;sy=p.clientY;ix=r.left;iy=r.top;document.addEventListener("mousemove",move);document.addEventListener("touchmove",move,{passive:false});document.addEventListener("mouseup",end);document.addEventListener("touchend",end)}
 function move(e){const p=e.touches?e.touches[0]:e,dx=p.clientX-sx,dy=p.clientY-sy;if(Math.abs(dx)>5||Math.abs(dy)>5){drag=true;if(e.cancelable)e.preventDefault();el.style.left=ix+dx+"px";el.style.top=iy+dy+"px";el.style.right="auto"}}
 function end(){document.removeEventListener("mousemove",move);document.removeEventListener("touchmove",move);document.removeEventListener("mouseup",end);document.removeEventListener("touchend",end);if(drag){const r=el.getBoundingClientRect();el.style.left=(r.left+r.width/2<innerWidth/2?10:innerWidth-r.width-10)+"px";el.style.top=Math.max(50,Math.min(r.top,innerHeight-60))+"px"}}
-el.onclick=e=>drag?e.preventDefault():toggleCart(true);
-el.addEventListener("mousedown",start);el.addEventListener("touchstart",start,{passive:false});
+el.onclick=e=>drag?e.preventDefault():toggleCart(true);el.addEventListener("mousedown",start);el.addEventListener("touchstart",start,{passive:false});
 })();
 
-window.onload=loadData;
+window.onload=()=>{renderTabs();updateCartUI();switchTab("pending")};
 </script>
 </body>
 </html>

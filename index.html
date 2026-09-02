@@ -6,6 +6,7 @@
 <link rel="icon" href="https://i.postimg.cc/3R7nNT0k/icon.png" type="image/png">
 <style>
 :root{--theme:#D9C0FA;--active:#8A6FA8;--text:#333}
+*{box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);text-align:center;overflow-x:hidden}
 .top-bar{position:fixed;top:0;left:0;width:100%;height:40px;background:var(--theme);color:#fff;z-index:999;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:bold}
 .header-fixed{position:fixed;top:40px;width:100%;background:#fff;z-index:998;border-bottom:1px solid #eee}
@@ -23,7 +24,9 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
 .card img{height:90px;width:auto;max-width:90%;display:block;margin:5px auto 0;object-fit:contain;pointer-events:none}
-.card .name{margin:1px auto;font-size:9px;font-weight:bold;line-height:1.2;padding:0 2px}.card .price{font-size:10px;margin:1px auto;color:var(--active)}.card .size{font-size:8px;margin:0 auto 5px;color:#888}
+.card .buyer{margin:2px 2px 0;font-size:9px;font-weight:bold;line-height:1.2;color:#989FC0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .name{margin:1px 2px;font-size:9px;font-weight:bold;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .price{font-size:10px;margin:1px auto 5px;color:#F68450}
 .card-overlay{position:fixed;inset:0;background:#000b;z-index:10000;display:flex;justify-content:center;align-items:center}.card-overlay .card{transform:scale(3.1);width:100px;padding:15px 0 5px;pointer-events:none}
 #cart-overlay-bg{position:fixed;inset:0;background:#0006;display:none;z-index:1000}
 #cart-trigger{position:fixed;top:155px;right:15px;width:45px;height:45px;background:#fff;border-radius:50%;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 8px #0003;z-index:999;opacity:.85;cursor:move;touch-action:none}
@@ -31,7 +34,8 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 #cart-panel{position:fixed;top:0;right:-300px;width:280px;height:100%;background:#fff;box-shadow:-5px 0 15px #0002;z-index:1001;transition:.3s;display:flex;flex-direction:column}#cart-panel.open{right:0}
 .cart-header{padding:12px 15px;background:var(--theme);color:#fff;font-weight:bold;font-size:16px;text-align:left;display:flex;justify-content:space-between}
 .cart-list{flex:1;overflow-y:auto;padding:10px;text-align:left}.cart-item{display:flex;align-items:center;gap:10px;margin-bottom:10px;border-bottom:1px solid #eee;padding-bottom:8px;font-size:12px}
-.cart-item img{width:45px;height:45px;object-fit:contain}.cart-item-info{flex:1}.cart-footer{padding:15px 15px 25px;border-top:1px solid #eee;background:#fafafa}
+.cart-item img{width:45px;height:45px;object-fit:contain}.cart-item-info{flex:1;min-width:0}.cart-footer{padding:15px 15px 25px;border-top:1px solid #eee;background:#fafafa}
+.cart-buyer{color:#989FC0;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cart-name{font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cart-price{color:#F68450;font-weight:bold}
 .shipping-box{font-size:12px;text-align:left;background:#fff;border:1px solid #eee;border-radius:7px;padding:8px;margin-bottom:10px;line-height:1.8}
 .text-clear{display:block;text-align:left;color:#aaa;font-size:13px;text-decoration:underline;cursor:pointer;margin-bottom:10px}
 .btn-checkout{background:var(--theme);color:#fff;border:0;padding:12px;width:100%;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px}
@@ -85,6 +89,8 @@ function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"
 function yen(v){const n=Number(String(v||"").replace(/[^\d.-]/g,""));return Number.isFinite(n)?n:0}
 function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
+function buyerText(i){return`${i.source?`(${i.source})`:""}${i.customer||""}`}
+function productText(i){return`${i.name||""}${i.role?` ${i.role}`:""}`.trim()}
 
 function renderTabs(){
 document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("");
@@ -94,8 +100,8 @@ async function getSheet(sheet){
 if(sheetCache[sheet])return sheetCache[sheet];
 const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&headers=1`;
 const t=await fetch(url).then(r=>r.text()),data=JSON.parse(t.substr(47).slice(0,-2)),L=(data.table.cols||[]).map(c=>String(c.label||"").trim());
-const C={ip:col(L,"IP"),role:col(L,"角色"),type:col(L,"種類"),name:col(L,"名稱"),originalPrice:col(L,"原價"),stock:col(L,"庫存"),sn:col(L,"貨號"),img:col(L,"圖片","首圖"),url:col(L,"商品網址","網址"),size:col(L,"尺寸"),status:col(L,"狀態"),group:col(L,"團名"),source:col(L,"來源"),customer:col(L,"顧客名稱","購買人","訂購人")};
-return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),originalPrice:getV(r,C.originalPrice),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img),url:getV(r,C.url),size:getV(r,C.size),status:getV(r,C.status),group:getV(r,C.group),source:getV(r,C.source),customer:getV(r,C.customer)}));
+const C={ip:col(L,"IP"),role:col(L,"角色"),type:col(L,"種類"),name:col(L,"名稱"),originalPrice:col(L,"原價"),stock:col(L,"庫存"),sn:col(L,"貨號"),img:col(L,"圖片","首圖"),url:col(L,"商品網址","網址"),status:col(L,"狀態"),group:col(L,"團名"),source:col(L,"來源"),customer:col(L,"顧客名稱","購買人","訂購人")};
+return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),originalPrice:getV(r,C.originalPrice),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img),url:getV(r,C.url),status:getV(r,C.status),group:getV(r,C.group),source:getV(r,C.source),customer:getV(r,C.customer)}));
 }
 
 function findStock(item,stock){
@@ -103,9 +109,9 @@ if(item.sn)return stock.find(x=>x.sn&&String(x.sn).trim()===String(item.sn).trim
 return stock.find(x=>String(x.role).trim()===String(item.role).trim()&&String(x.name).trim()===String(item.name).trim())||null;
 }
 
-function mergeStock(item,stock,showBuyer=false){
-const s=findStock(item,stock),prefix=showBuyer&&((item.source||"")+(item.customer||""))?`${item.source||""}${item.customer||""} `:"";
-return {...item,ip:item.ip||s?.ip||"",role:item.role||s?.role||"",type:item.type||s?.type||"",img:s?.img||item.img,url:item.url||s?.url||"",size:item.size||s?.size||"",sn:item.sn||s?.sn||"",originalPrice:s?.originalPrice||"",displayName:prefix+item.name};
+function mergeStock(item,stock){
+const s=findStock(item,stock);
+return {...item,ip:item.ip||s?.ip||"",role:item.role||s?.role||"",type:item.type||s?.type||"",img:s?.img||item.img,url:item.url||s?.url||"",sn:item.sn||s?.sn||"",originalPrice:s?.originalPrice||""};
 }
 
 function filterNormal(rows,key){
@@ -117,10 +123,9 @@ return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(
 async function switchTab(key){
 currentTab=key;selectedTypes=[];selectedRole=null;renderTabs();
 
-const fw=document.querySelector(".filter-bar-wrapper");
-fw.style.display=key==="pending"?"none":"flex";
-document.getElementById("card-container").style.paddingTop=key==="pending"?"128px":"158px";
-
+const hideFilter=key==="pending",fw=document.querySelector(".filter-bar-wrapper");
+fw.style.display=hideFilter?"none":"flex";
+document.getElementById("card-container").style.paddingTop=hideFilter?"128px":"158px";
 document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
 try{
@@ -128,27 +133,16 @@ let rows=await getSheet(TABS[key].sheet),stock;
 
 if(key==="pending"){
 stock=await getSheet("商品庫存");
-rows=rows
-.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group))
-.map(i=>mergeStock(i,stock,true))
-.filter(i=>ALLOWED.includes(originOf(i.url)));
+rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).filter(i=>ALLOWED.includes(originOf(i.url)));
 }else if(key==="latest"){
 stock=await getSheet("商品庫存");
-rows=rows
-.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
-.map(i=>mergeStock(i,stock,true));
+rows=rows.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock));
 }else{
 rows=filterNormal(rows,key);
 }
 
-allItems=rows.map(i=>({
-...i,
-displayName:i.displayName||i.name,
-category:key==="pending"
-?siteName(originOf(i.url))
-:key==="latest"
-?(i.group||"其他")
-:(i.role||i.ip||i.group||"其他"),
+allItems=rows.map(i=>({...i,
+category:key==="pending"?siteName(originOf(i.url)):key==="latest"?(i.group||"其他"):(i.role||i.ip||i.group||"其他"),
 type:i.type||"其他"
 }));
 
@@ -157,11 +151,8 @@ allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
 
 renderRoleNav();
 
-if(key==="pending"){
-document.getElementById("filter-bar").innerHTML="";
-}else{
-renderFilters();
-}
+if(hideFilter)document.getElementById("filter-bar").innerHTML="";
+else renderFilters();
 
 renderItems();
 
@@ -229,17 +220,12 @@ box.appendChild(g);
 }
 
 function createCard(item){
-const c=document.createElement("div");
+const c=document.createElement("div"),buyer=buyerText(item);
 c.className="card";
-c.innerHTML=`<div class="add-btn-tag">＋</div><img src="${item.img||IMG}"><div class="name">${formatName(item.displayName)}</div><div class="price">${priceText(item.originalPrice)}</div><div class="size">${item.size||""}</div>`;
+c.innerHTML=`<div class="add-btn-tag">＋</div><img src="${item.img||IMG}">${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}<div class="name" title="${productText(item)}">${productText(item)}</div><div class="price">${priceText(item.originalPrice)}</div>`;
 c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);
 c.onclick=()=>zoomCard(c);
 return c;
-}
-
-function formatName(n){
-if(!n)return"";
-return n.includes(" ")?n.split(" ").join("<br>"):n.length>9?n.slice(0,9)+"<br>"+n.slice(9):n;
 }
 
 function zoomCard(c){
@@ -288,9 +274,7 @@ let total=0;
 cart.forEach(i=>{
 const o=originOf(i.url)||"未知官網",p=yen(i.originalPrice);
 total+=p;
-
 if(!groups[o])groups[o]={total:0,missing:0};
-
 groups[o].total+=p;
 if(!p)groups[o].missing++;
 });
@@ -300,7 +284,6 @@ return{groups,total};
 
 function shippingHtml(){
 const {groups}=cartInfo();
-
 if(!Object.keys(groups).length)return"尚未加入商品";
 
 return Object.entries(groups).map(([o,g])=>{
@@ -312,15 +295,19 @@ return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br>${d?`還差 <b>¥${fmt
 }
 
 function updateCartUI(){
-document.getElementById("cart-list").innerHTML=cart.map((i,n)=>`
-<div class="cart-item">
+document.getElementById("cart-list").innerHTML=cart.map((i,n)=>{
+const b=buyerText(i);
+
+return `<div class="cart-item">
 <img src="${i.img||IMG}">
 <div class="cart-item-info">
-<div style="font-weight:bold">${i.displayName||i.name}</div>
-<div style="color:#718596;font-weight:bold">${priceText(i.originalPrice)}</div>
+${b?`<div class="cart-buyer" title="${b}">${b}</div>`:""}
+<div class="cart-name" title="${productText(i)}">${productText(i)}</div>
+<div class="cart-price">${priceText(i.originalPrice)}</div>
 </div>
 <span style="cursor:pointer;color:#ccc;padding:5px" onclick="removeFromCart(${n})">✕</span>
-</div>`).join("");
+</div>`;
+}).join("");
 
 const b=document.getElementById("cart-badge"),x=cartInfo();
 b.textContent=cart.length;
@@ -341,14 +328,18 @@ document.getElementById("checkout-modal").style.display="none";
 }
 
 function renderCheckoutSummary(){
-document.getElementById("modal-summary-list").innerHTML=cart.map(i=>`
-<div class="cart-item">
+document.getElementById("modal-summary-list").innerHTML=cart.map(i=>{
+const b=buyerText(i);
+
+return `<div class="cart-item">
 <img src="${i.img||IMG}">
 <div class="cart-item-info">
-<div style="font-weight:bold">${i.displayName||i.name}</div>
-<div style="color:#718596;font-weight:bold">${priceText(i.originalPrice)}</div>
+${b?`<div class="cart-buyer" title="${b}">${b}</div>`:""}
+<div class="cart-name" title="${productText(i)}">${productText(i)}</div>
+<div class="cart-price">${priceText(i.originalPrice)}</div>
 </div>
-</div>`).join("");
+</div>`;
+}).join("");
 
 document.getElementById("modal-total-price").textContent=`¥${fmt(cartInfo().total)}`;
 document.getElementById("modal-shipping").innerHTML=shippingHtml();

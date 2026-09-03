@@ -45,6 +45,7 @@ body.latest-tab .nav-bar-wrapper .nav-arrow{display:none}
 body.latest-tab #role-scroll{overflow:visible;white-space:normal}
 body.latest-tab .nav-bar{display:flex;flex-wrap:wrap;justify-content:center;padding:0;white-space:normal}
 body.latest-tab .nav-bar a{padding:5px 3px}
+.ordered-tag{position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;background:#8A6FA8;color:#fff;font-size:12px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
 </style>
 </head>
 <body>
@@ -85,7 +86,7 @@ const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
 const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 
-let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
+let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
@@ -112,7 +113,26 @@ const t=await fetch(url).then(r=>r.text()),data=JSON.parse(t.substr(47).slice(0,
 const C={ip:col(L,"IP"),role:col(L,"角色"),type:col(L,"種類"),name:col(L,"名稱"),originalPrice:col(L,"原價"),stock:col(L,"庫存"),sn:col(L,"貨號"),img:col(L,"圖片","首圖"),url:col(L,"商品網址","網址"),status:col(L,"狀態"),group:col(L,"團名"),source:col(L,"來源"),customer:col(L,"顧客名稱","購買人","訂購人")};
 return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),originalPrice:getV(r,C.originalPrice),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img),url:getV(r,C.url),status:getV(r,C.status),group:getV(r,C.group),source:getV(r,C.source),customer:getV(r,C.customer)}));
 }
+async function loadOrderedCounts(){
+const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("已訂購清單")}&headers=1`;
+const t=await fetch(url).then(r=>r.text()),d=JSON.parse(t.substr(47).slice(0,-2));
+const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
+const T=col(L,"時間"),S=col(L,"貨號"),N=col(L,"名稱"),Q=col(L,"數量");
+const rows=d.table.rows||[];
 
+let latest="";
+rows.forEach(r=>{const x=getV(r,T);if(x)latest=x});
+
+const counts={};
+rows.forEach(r=>{
+if(getV(r,T)!==latest)return;
+const sn=getV(r,S),name=getV(r,N),qty=Number(getV(r,Q))||0;
+const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
+counts[key]=(counts[key]||0)+qty;
+});
+
+orderedCounts=counts;
+}
 function findStock(item,stock){
 const sn=norm(item.sn);
 if(sn){const s=stock.find(x=>norm(x.sn)===sn);if(s)return s}
@@ -147,7 +167,7 @@ document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;col
 
 try{
 let rows=await getSheet(TABS[key].sheet),stock;
-
+await loadOrderedCounts();
 if(key==="pending"){
 stock=await getSheet("商品庫存");
 rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).filter(i=>ALLOWED.includes(originOf(i.url)));
@@ -223,6 +243,22 @@ box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品<
 return;
 }
 
+const remain={...orderedCounts};
+
+const card=i=>{
+const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+const marked=(remain[key]||0)>0;
+if(marked)remain[key]--;
+return createCard(i,marked);
+};
+
+const grid=a=>{
+const g=document.createElement("div");
+g.className="group-grid";
+a.forEach(i=>g.appendChild(card(i)));
+box.appendChild(g);
+};
+
 if(!selectedTypes.length&&!selectedRole){
 const hidden=[];
 
@@ -239,25 +275,29 @@ const d=document.createElement("div");
 d.className="type-divider";
 d.textContent=c;
 box.appendChild(d);
-addGrid(box,a);
+grid(a);
 });
 
-if(hidden.length)addGrid(box,hidden);
+if(hidden.length)grid(hidden);
 
 }else{
-const g=document.createElement("div");
-g.className="group-grid";
-g.style.paddingTop="10px";
-items.forEach(i=>g.appendChild(createCard(i)));
-box.appendChild(g);
+grid(items);
 }
 }
 
-function createCard(item){
+function createCard(item,ordered=false){
 const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
 const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${!item.sn&&!item.url?"缺貨號、商品網址":!item.sn?"缺貨號":"缺商品網址"}</div>`:"";
+
 c.className="card";
-c.innerHTML=`${rem?"":'<div class="add-btn-tag">＋</div>'}<img src="${item.img||IMG}">${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}<div class="name" title="${productText(item)}">${productText(item)}</div><div class="price">${priceText(item.originalPrice)}</div>${miss}`;
+c.innerHTML=
+`${ordered?'<div class="ordered-tag">✓</div>':""}
+${rem?"":'<div class="add-btn-tag">＋</div>'}
+<img src="${item.img||IMG}">
+${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
+<div class="name" title="${productText(item)}">${productText(item)}</div>
+<div class="price">${priceText(item.originalPrice)}</div>${miss}`;
+
 if(!rem)c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);
 c.onclick=()=>zoomCard(c);
 return c;

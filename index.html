@@ -97,8 +97,10 @@ function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
 function buyerText(i){return`${i.source?`(${i.source})`:""}${i.customer||""}`}
 function norm(v){return String(v||"").replace(/\s+/g,"").trim()}
-function productText(i){const n=String(i.name||"").trim(),r=String(i.role||"").trim();return!r||norm(n).includes(norm(r))?n:`${n} ${r}`}
-
+function productText(i){
+const n=String(i.name||"").trim(),r=String(i.role||"").trim();
+return!r||HIDE_ROLES.includes(r)||norm(n).includes(norm(r))?n:`${n} ${r}`;
+}
 function renderTabs(){
 document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("");
 }

@@ -125,7 +125,7 @@ return {...item,ip:item.ip||s?.ip||"",role:item.role||s?.role||"",type:item.type
 }
 
 function mergeLatestPrice(item,latest){
-const s=findMatch(item,latest);
+const s=findStock(item,latest);
 return{...item,img:s?.img||item.img,originalPrice:s?.originalPrice||item.originalPrice||""}
 }
 
@@ -138,9 +138,14 @@ return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(
 async function switchTab(key){
 currentTab=key;selectedTypes=[];selectedRole=null;renderTabs();
 
+const rw=document.querySelector(".nav-bar-wrapper");
 const fw=document.querySelector(".filter-bar-wrapper");
-fw.style.display=key==="pending"?"none":"flex";
-document.getElementById("card-container").style.paddingTop=key==="pending"?"128px":"158px";
+
+rw.style.display=key==="latest"?"none":"flex";
+fw.style.display=(key==="pending"||key==="latest")?"none":"flex";
+
+document.getElementById("card-container").style.paddingTop=
+key==="latest"?"90px":key==="pending"?"128px":"158px";
 document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
 try{

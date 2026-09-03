@@ -23,6 +23,8 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
+.ordered-tag{position:absolute;top:3px;left:5px;color:#E24C60;font-size:18px;font-weight:bold;line-height:1;z-index:10}
+.soldout-tag{position:absolute;top:3px;left:4px;font-size:15px;line-height:1;z-index:10}
 .card img{height:90px;width:auto;max-width:90%;display:block;margin:5px auto 0;object-fit:contain;pointer-events:none}
 .card .buyer{margin:2px 2px 0;font-size:9px;font-weight:bold;line-height:1.2;color:#989FC0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .name{margin:1px 2px;font-size:9px;font-weight:bold;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -45,7 +47,6 @@ body.latest-tab .nav-bar-wrapper .nav-arrow{display:none}
 body.latest-tab #role-scroll{overflow:visible;white-space:normal}
 body.latest-tab .nav-bar{display:flex;flex-wrap:wrap;justify-content:center;padding:0;white-space:normal}
 body.latest-tab .nav-bar a{padding:5px 3px}
-.ordered-tag{position:absolute;top:3px;left:5px;color:#E24C60;font-size:18px;font-weight:bold;line-height:1;z-index:10}
 </style>
 </head>
 <body>
@@ -86,7 +87,7 @@ const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
 const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 
-let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
+let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
@@ -98,10 +99,8 @@ function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
 function buyerText(i){return`${i.source?`(${i.source})`:""}${i.customer||""}`}
 function norm(v){return String(v||"").replace(/\s+/g,"").trim()}
-function productText(i){
-const n=String(i.name||"").trim(),r=String(i.role||"").trim();
-return!r||HIDE_ROLES.includes(r)||norm(n).includes(norm(r))?n:`${n} ${r}`;
-}
+function productText(i){const n=String(i.name||"").trim(),r=String(i.role||"").trim();return!r||HIDE_ROLES.includes(r)||norm(n).includes(norm(r))?n:`${n} ${r}`}
+
 function renderTabs(){
 document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("");
 }
@@ -113,31 +112,32 @@ const t=await fetch(url).then(r=>r.text()),data=JSON.parse(t.substr(47).slice(0,
 const C={ip:col(L,"IP"),role:col(L,"角色"),type:col(L,"種類"),name:col(L,"名稱"),originalPrice:col(L,"原價"),stock:col(L,"庫存"),sn:col(L,"貨號"),img:col(L,"圖片","首圖"),url:col(L,"商品網址","網址"),status:col(L,"狀態"),group:col(L,"團名"),source:col(L,"來源"),customer:col(L,"顧客名稱","購買人","訂購人")};
 return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),originalPrice:getV(r,C.originalPrice),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img),url:getV(r,C.url),status:getV(r,C.status),group:getV(r,C.group),source:getV(r,C.source),customer:getV(r,C.customer)}));
 }
+
 async function loadOrderedCounts(){
 const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("已訂購清單")}&headers=1`;
 const t=await fetch(url).then(r=>r.text()),d=JSON.parse(t.substr(47).slice(0,-2));
 const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
-const T=col(L,"時間"),S=col(L,"貨號"),N=col(L,"名稱"),Q=col(L,"數量");
-const rows=d.table.rows||[];
+const T=col(L,"時間"),S=col(L,"貨號"),N=col(L,"名稱"),Q=col(L,"數量"),O=col(L,"缺貨"),rows=d.table.rows||[];
 
 let latest="";
 rows.forEach(r=>{const x=getV(r,T);if(x)latest=x});
 
-const counts={};
+const ok={},bad={};
 rows.forEach(r=>{
 if(getV(r,T)!==latest)return;
-const sn=getV(r,S),name=getV(r,N),qty=Number(getV(r,Q))||0;
-const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
-counts[key]=(counts[key]||0)+qty;
+const sn=getV(r,S),name=getV(r,N),key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
+ok[key]=(ok[key]||0)+(Number(getV(r,Q))||0);
+bad[key]=(bad[key]||0)+(Number(getV(r,O))||0);
 });
-
-orderedCounts=counts;
+orderedCounts=ok;
+soldOutCounts=bad;
 }
+
 function findStock(item,stock){
 const sn=norm(item.sn);
 if(sn){const s=stock.find(x=>norm(x.sn)===sn);if(s)return s}
 const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`);
-return stock.find(x=>{const xn=norm(x.name),xr=norm(x.role);return(xn===name&&xr===role)||norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full})||null;
+return stock.find(x=>(norm(x.name)===name&&norm(x.role)===role)||norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full)||null;
 }
 
 function mergeStock(item,stock){
@@ -168,16 +168,15 @@ document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;col
 try{
 let rows=await getSheet(TABS[key].sheet),stock;
 await loadOrderedCounts();
+
 if(key==="pending"){
 stock=await getSheet("商品庫存");
 rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).filter(i=>ALLOWED.includes(originOf(i.url)));
-
 }else if(key==="latest"||key==="reminder"){
 stock=await getSheet("商品庫存");
 const latest=await getSheet("最新開團");
 rows=rows.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).map(i=>mergeLatestPrice(i,latest));
 rows=key==="latest"?rows.filter(i=>i.sn&&i.url):rows.filter(i=>!i.sn||!i.url);
-
 }else rows=filterNormal(rows,key);
 
 allItems=rows.map(i=>({...i,
@@ -223,14 +222,6 @@ selectedTypes=selectedTypes.includes(t)?selectedTypes.filter(x=>x!==t):[...selec
 renderFilters();renderItems();
 }
 
-function addGrid(box,items){
-if(!items.length)return;
-const g=document.createElement("div");
-g.className="group-grid";
-items.forEach(i=>g.appendChild(createCard(i)));
-box.appendChild(g);
-}
-
 function renderItems(){
 const box=document.getElementById("items-wrapper");
 box.innerHTML="";
@@ -247,9 +238,16 @@ const remain={...orderedCounts};
 
 const card=i=>{
 const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
-const marked=(remain[key]||0)>0;
-if(marked)remain[key]--;
-return createCard(i,marked);
+let status="";
+
+if((remain[key]||0)>0){
+status="ordered";
+remain[key]--;
+}else if((soldOutCounts[key]||0)>0){
+status="soldout";
+}
+
+return createCard(i,status);
 };
 
 const grid=a=>{
@@ -279,19 +277,17 @@ grid(a);
 });
 
 if(hidden.length)grid(hidden);
-
-}else{
-grid(items);
-}
+}else grid(items);
 }
 
-function createCard(item,ordered=false){
+function createCard(item,status=""){
 const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
 const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${!item.sn&&!item.url?"缺貨號、商品網址":!item.sn?"缺貨號":"缺商品網址"}</div>`:"";
 
 c.className="card";
 c.innerHTML=
-`${ordered?'<div class="ordered-tag">✓</div>':""}
+`${status==="ordered"?'<div class="ordered-tag">✓</div>':""}
+${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
 ${rem?"":'<div class="add-btn-tag">＋</div>'}
 <img src="${item.img||IMG}">
 ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
@@ -385,7 +381,7 @@ document.getElementById("modal-total-price").textContent=`¥${fmt(cartInfo().tot
 document.getElementById("modal-shipping").innerHTML=shippingHtml();
 }
 
-async function getVariantId(item){
+async function getVariantInfo(item){
 if(!item.url)throw new Error(`${item.name} 沒有商品網址`);
 
 const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
@@ -395,47 +391,40 @@ const r=await fetch(`${u.origin}/products/${m[1]}.js`);
 if(!r.ok)throw new Error(`${item.name} 無法讀取商品資料`);
 
 const p=await r.json();
+let v;
 
 if(u.origin===SITES.mogu){
-const v=(p.variants||[])[0];
-if(!v?.id)throw new Error(`${item.name} 找不到商品`);
-return String(v.id);
-}
-
+v=(p.variants||[])[0];
+}else{
 if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
-
-const v=(p.variants||[]).find(x=>
-String(x.sku||"").trim()===String(item.sn).trim()
-);
-
-if(!v?.id)throw new Error(`${item.name} 找不到貨號 ${item.sn}`);
-return String(v.id);
+v=(p.variants||[]).find(x=>String(x.sku||"").trim()===String(item.sn).trim());
 }
 
-async function makeCartUrl(origin,items){
-const ids=await Promise.all(items.map(getVariantId)),qty={};
-ids.forEach(id=>qty[id]=(qty[id]||0)+1);
-return `${origin}/cart/${Object.entries(qty).map(([id,n])=>`${id}:${n}`).join(",")}`;
+if(!v?.id)throw new Error(`${item.name} 找不到商品`);
+return{id:String(v.id),available:v.available!==false};
 }
 
-/* 不等待 GAS，頁面離開時背景登記 */
-function recordOrderedList(items){
-const body=JSON.stringify({
-action:"recordOrder",
-items:items.map(i=>({
-group:i.group||"",
-sn:String(i.sn||"").trim(),
-name:String(i.name||"").trim()
-}))
-});
+async function makeCartData(origin,items){
+const result=await Promise.all(items.map(async item=>({item,info:await getVariantInfo(item)})));
+const ordered=result.filter(x=>x.info.available).map(x=>x.item);
+const soldOut=result.filter(x=>!x.info.available).map(x=>x.item);
+const qty={};
 
-const send=()=>{
-const blob=new Blob([body],{type:"text/plain;charset=utf-8"});
-if(!navigator.sendBeacon(ORDER_API,blob))
-fetch(ORDER_API,{method:"POST",body,keepalive:true,mode:"no-cors"}).catch(()=>{});
+result.filter(x=>x.info.available).forEach(x=>qty[x.info.id]=(qty[x.info.id]||0)+1);
+
+return{
+ordered,soldOut,
+url:ordered.length?`${origin}/cart/${Object.entries(qty).map(([id,n])=>`${id}:${n}`).join(",")}`:""
 };
+}
 
-window.addEventListener("pagehide",send,{once:true});
+function recordOrderedList(ordered,soldOut){
+const pack=a=>a.map(i=>({group:i.group||"",sn:String(i.sn||"").trim(),name:String(i.name||"").trim()}));
+const body=JSON.stringify({action:"recordOrder",ordered:pack(ordered),soldOut:pack(soldOut)});
+const blob=new Blob([body],{type:"text/plain;charset=utf-8"});
+
+if(!navigator.sendBeacon||!navigator.sendBeacon(ORDER_API,blob))
+fetch(ORDER_API,{method:"POST",body,keepalive:true,mode:"no-cors"}).catch(()=>{});
 }
 
 async function handleFinalCheckout(){
@@ -443,7 +432,7 @@ const btn=document.getElementById("send-btn");
 btn.disabled=true;
 btn.textContent="正在加入官網購物車...";
 
-let opened=[];
+const opened={};
 
 try{
 if(cart.some(i=>!i.url||(originOf(i.url)!==SITES.mogu&&!i.sn)))
@@ -458,27 +447,49 @@ if(!o)throw new Error(`${i.name} 商品網址錯誤`);
 
 const origins=Object.keys(groups);
 
-for(const o of origins.slice(1)){
+origins.slice(1).forEach(o=>{
 const w=window.open("about:blank","_blank");
 if(!w)throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗");
-opened.push({o,w});
+opened[o]=w;
+});
+
+const data={};
+await Promise.all(origins.map(async o=>data[o]=await makeCartData(o,groups[o])));
+
+const ordered=origins.flatMap(o=>data[o].ordered);
+const soldOut=origins.flatMap(o=>data[o].soldOut);
+const availableOrigins=origins.filter(o=>data[o].url);
+
+recordOrderedList(ordered,soldOut);
+
+if(!availableOrigins.length){
+Object.values(opened).forEach(w=>{try{w.close()}catch{}});
+
+soldOut.forEach(i=>{
+const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+soldOutCounts[key]=(soldOutCounts[key]||0)+1;
+});
+
+cart=[];saveCart();closeModal();updateCartUI();renderItems();
+alert("購物車內商品目前都已缺貨，已記錄缺貨");
+btn.disabled=false;
+btn.textContent="確認訂購";
+return;
 }
 
-const urls={};
-for(const o of origins)urls[o]=await makeCartUrl(o,groups[o]);
+const main=availableOrigins[0];
 
-/* 官網購物車優先 */
-opened.forEach(x=>x.w.location.href=urls[x.o]);
+origins.slice(1).forEach(o=>{
+if(o===main||!data[o].url){
+try{opened[o]?.close()}catch{}
+}else opened[o].location.href=data[o].url;
+});
 
-const ordered=[...cart];
 cart=[];saveCart();
-
-/* 不等登記完成，直接開始轉跳 */
-recordOrderedList(ordered);
-location.href=urls[origins[0]];
+location.href=data[main].url;
 
 }catch(e){
-opened.forEach(x=>{try{x.w.close()}catch{}});
+Object.values(opened).forEach(w=>{try{w.close()}catch{}});
 console.error(e);
 alert(e.message);
 btn.disabled=false;

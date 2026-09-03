@@ -141,11 +141,11 @@ currentTab=key;selectedTypes=[];selectedRole=null;renderTabs();
 const rw=document.querySelector(".nav-bar-wrapper");
 const fw=document.querySelector(".filter-bar-wrapper");
 
-rw.style.display=key==="latest"?"none":"flex";
+rw.style.display="flex";
 fw.style.display=(key==="pending"||key==="latest")?"none":"flex";
 
 document.getElementById("card-container").style.paddingTop=
-key==="latest"?"90px":key==="pending"?"128px":"158px";
+(key==="pending"||key==="latest")?"128px":"158px";
 document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
 try{

@@ -83,8 +83,7 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",FREE_SHIPPING=11000,IMG="https://i.postimg.cc/bv5xRs04/image.png";
 const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop"},ALLOWED=Object.values(SITES);
 const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
-const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
-
+const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
@@ -144,13 +143,13 @@ return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(
 
 async function switchTab(key){
 currentTab=key;selectedTypes=[];selectedRole=null;
-document.body.classList.toggle("latest-tab",key==="latest");
+document.body.classList.toggle("latest-tab",key==="latest"||key==="reminder");
 renderTabs();
 const rw=document.querySelector(".nav-bar-wrapper");
 const fw=document.querySelector(".filter-bar-wrapper");
 
 rw.style.display="flex";
-fw.style.display=(key==="pending"||key==="latest")?"none":"flex";
+fw.style.display=["pending","latest","reminder"].includes(key)?"none":"flex";
   
 document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
@@ -164,7 +163,7 @@ rows=rows
 .map(i=>mergeStock(i,stock))
 .filter(i=>ALLOWED.includes(originOf(i.url)));
 
-}else if(key==="latest"){
+}else if(key==="latest"||key==="reminder"){
 stock=await getSheet("商品庫存");
 const latest=await getSheet("最新開團");
 
@@ -172,6 +171,10 @@ rows=rows
 .filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
 .map(i=>mergeStock(i,stock))
 .map(i=>mergeLatestPrice(i,latest));
+
+rows=key==="latest"
+?rows.filter(i=>i.sn&&i.url)
+:rows.filter(i=>!i.sn||!i.url);
 
 }else{
 rows=filterNormal(rows,key);
@@ -181,7 +184,7 @@ allItems=rows.map(i=>({
 ...i,
 category:key==="pending"
 ?siteName(originOf(i.url))
-:key==="latest"
+:(key==="latest"||key==="reminder")
 ?(i.group||"其他")
 :(i.role||i.ip||i.group||"其他"),
 type:i.type||"其他"
@@ -262,10 +265,11 @@ box.appendChild(g);
 }
 
 function createCard(item){
-const c=document.createElement("div"),buyer=buyerText(item);
+const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
+const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${!item.sn&&!item.url?"缺貨號、商品網址":!item.sn?"缺貨號":"缺商品網址"}</div>`:"";
 c.className="card";
-c.innerHTML=`<div class="add-btn-tag">＋</div><img src="${item.img||IMG}">${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}<div class="name" title="${productText(item)}">${productText(item)}</div><div class="price">${priceText(item.originalPrice)}</div>`;
-c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);
+c.innerHTML=`${rem?"":'<div class="add-btn-tag">＋</div>'}<img src="${item.img||IMG}">${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}<div class="name" title="${productText(item)}">${productText(item)}</div><div class="price">${priceText(item.originalPrice)}</div>${miss}`;
+if(!rem)c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);
 c.onclick=()=>zoomCard(c);
 return c;
 }

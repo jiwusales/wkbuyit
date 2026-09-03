@@ -40,6 +40,13 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .btn-checkout{background:var(--theme);color:#fff;border:0;padding:12px;width:100%;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px}
 #checkout-modal{position:fixed;inset:0;background:#000c;z-index:2000;display:none;align-items:center;justify-content:center}.modal-content{background:#fff;width:85%;max-width:380px;border-radius:15px;padding:20px;position:relative}
 .summary-box{background:#f9f9f9;padding:10px;border-radius:5px;font-size:12px;max-height:280px;overflow-y:auto;text-align:left;margin-bottom:10px;border:1px solid #eee}
+
+body.latest-tab .nav-bar-wrapper{height:auto;min-height:38px;padding:4px 10px}
+body.latest-tab .nav-bar-wrapper .nav-arrow{display:none}
+body.latest-tab #role-scroll{overflow:visible;white-space:normal}
+body.latest-tab .nav-bar{display:flex;flex-wrap:wrap;justify-content:center;padding:0;white-space:normal}
+body.latest-tab .nav-bar a{padding:5px 3px}
+
 </style>
 </head>
 <body>
@@ -136,16 +143,15 @@ return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(
 }
 
 async function switchTab(key){
-currentTab=key;selectedTypes=[];selectedRole=null;renderTabs();
-
+currentTab=key;selectedTypes=[];selectedRole=null;
+document.body.classList.toggle("latest-tab",key==="latest");
+renderTabs();
 const rw=document.querySelector(".nav-bar-wrapper");
 const fw=document.querySelector(".filter-bar-wrapper");
 
 rw.style.display="flex";
 fw.style.display=(key==="pending"||key==="latest")?"none":"flex";
-
-document.getElementById("card-container").style.paddingTop=
-(key==="pending"||key==="latest")?"128px":"158px";
+  
 document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
 try{
@@ -190,7 +196,8 @@ if(key==="pending")document.getElementById("filter-bar").innerHTML="";
 else renderFilters();
 
 renderItems();
-
+requestAnimationFrame(()=>document.getElementById("card-container").style.paddingTop=
+40+document.querySelector(".header-fixed").offsetHeight+"px");
 }catch(e){
 console.error(e);
 document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>";

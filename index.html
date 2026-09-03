@@ -347,7 +347,6 @@ document.getElementById("modal-shipping").innerHTML=shippingHtml();
 
 async function getVariantId(item){
 if(!item.url)throw new Error(`${item.name} 沒有商品網址`);
-if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
 
 const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
 if(!m)throw new Error(`${item.name} 商品網址無法辨識`);
@@ -356,9 +355,22 @@ const r=await fetch(`${u.origin}/products/${m[1]}.js`);
 if(!r.ok)throw new Error(`${item.name} 無法讀取商品資料`);
 
 const p=await r.json();
-const v=(p.variants||[]).find(x=>String(x.sku||"").trim()===String(item.sn).trim());
-if(!v?.id)throw new Error(`${item.name} 找不到貨號 ${item.sn}`);
 
+/* 本舖直接靠商品網址取得 variant，不比貨號 */
+if(u.origin===SITES.mogu){
+const v=(p.variants||[])[0];
+if(!v?.id)throw new Error(`${item.name} 找不到商品`);
+return String(v.id);
+}
+
+/* ちいかわ、ナガノ維持用貨號比對 */
+if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
+
+const v=(p.variants||[]).find(x=>
+String(x.sku||"").trim()===String(item.sn).trim()
+);
+
+if(!v?.id)throw new Error(`${item.name} 找不到貨號 ${item.sn}`);
 return String(v.id);
 }
 

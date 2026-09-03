@@ -356,14 +356,12 @@ if(!r.ok)throw new Error(`${item.name} 無法讀取商品資料`);
 
 const p=await r.json();
 
-/* 本舖直接靠商品網址取得 variant，不比貨號 */
 if(u.origin===SITES.mogu){
 const v=(p.variants||[])[0];
 if(!v?.id)throw new Error(`${item.name} 找不到商品`);
 return String(v.id);
 }
 
-/* ちいかわ、ナガノ維持用貨號比對 */
 if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
 
 const v=(p.variants||[]).find(x=>
@@ -408,7 +406,8 @@ btn.textContent="正在加入官網購物車...";
 let opened=[];
 
 try{
-if(cart.some(i=>!i.url||!i.sn))throw new Error("有商品沒有貨號或商品網址");
+if(cart.some(i=>!i.url||(originOf(i.url)!==SITES.mogu&&!i.sn)))
+throw new Error("有商品缺少加入購物車需要的資料");
 
 const groups={};
 cart.forEach(i=>{

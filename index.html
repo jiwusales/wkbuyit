@@ -693,11 +693,7 @@ btn.disabled=false;
 btn.textContent="確認訂購";
 return;
 }
-
-if(manual.length)alert(`有 ${manual.length} 件商品需手動下單，已開啟商品頁面、清空購物車並在已訂購清單備註 🖥️`);
-
 location.href=data.destinations[0].url;
-
 }catch(e){
 spare.forEach(w=>{try{w.close()}catch{}});
 console.error(e);

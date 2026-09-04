@@ -23,12 +23,14 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
+.stock-warning{position:absolute;top:3px;left:4px;font-size:15px;line-height:18px;z-index:10}
 .ordered-tag{position:absolute;top:3px;left:5px;color:#E24C60;font-size:18px;font-weight:bold;line-height:1;z-index:10}
 .soldout-tag{position:absolute;top:3px;left:4px;font-size:15px;line-height:1;z-index:10}
 .card img{height:90px;width:auto;max-width:90%;display:block;margin:5px auto 0;object-fit:contain;pointer-events:none}
 .card .buyer{margin:2px 2px 0;font-size:9px;font-weight:bold;line-height:1.2;color:#989FC0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .name{margin:1px 2px;font-size:9px;font-weight:bold;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .price{font-size:10px;margin:1px auto 5px;color:#F68450}
+.product-link{display:inline-block;margin:0 auto 5px;padding:3px 8px;border:1px solid var(--theme);border-radius:6px;color:var(--active);font-size:9px;text-decoration:none;background:#fff}
 .card-overlay{position:fixed;inset:0;background:#000b;z-index:10000;display:flex;justify-content:center;align-items:center}.card-overlay .card{transform:scale(3.1);width:100px;padding:15px 0 5px;pointer-events:none}
 #cart-overlay-bg{position:fixed;inset:0;background:#0006;display:none;z-index:1000}
 #cart-trigger{position:fixed;top:155px;right:15px;width:45px;height:45px;background:#fff;border-radius:50%;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 8px #0003;z-index:999;opacity:.85;cursor:move;touch-action:none}
@@ -151,9 +153,10 @@ return{...item,img:s?.img||item.img,originalPrice:s?.originalPrice||item.origina
 }
 
 function filterNormal(rows,key){
-if(key==="chiikawa")return rows.filter(i=>i.name&&i.colStock==="0"&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
-if(key==="nagano")return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ナガノ"&&originOf(i.url)===SITES.nagano);
-return rows.filter(i=>i.name&&i.colStock==="0"&&i.ip==="ちいかわ"&&originOf(i.url)===SITES.mogu);
+const ok=i=>["0","1"].includes(i.colStock);
+if(key==="chiikawa")return rows.filter(i=>i.name&&ok(i)&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
+if(key==="nagano")return rows.filter(i=>i.name&&ok(i)&&i.ip==="ナガノ"&&originOf(i.url)===SITES.nagano);
+return rows.filter(i=>i.name&&ok(i)&&i.ip==="ちいかわ"&&originOf(i.url)===SITES.mogu);
 }
 
 async function switchTab(key){
@@ -283,16 +286,20 @@ if(hidden.length)grid(hidden);
 function createCard(item,status=""){
 const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
 const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${!item.sn&&!item.url?"缺貨號、商品網址":!item.sn?"缺貨號":"缺商品網址"}</div>`:"";
+const warn=["chiikawa","nagano","mogu"].includes(currentTab)&&item.colStock==="1";
+const link=item.url?`<a class="product-link" href="${item.url}" target="_blank" onclick="event.stopPropagation()">商品頁面</a>`:"";
 
 c.className="card";
 c.innerHTML=
 `${status==="ordered"?'<div class="ordered-tag">✓</div>':""}
 ${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
+${warn?'<div class="stock-warning">⚠️</div>':""}
 ${rem?"":'<div class="add-btn-tag">＋</div>'}
 <img src="${item.img||IMG}">
 ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
 <div class="name" title="${productText(item)}">${productText(item)}</div>
-<div class="price">${priceText(item.originalPrice)}</div>${miss}`;
+<div class="price">${priceText(item.originalPrice)}</div>
+${link}${miss}`;
 
 if(!rem)c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);
 c.onclick=()=>zoomCard(c);

@@ -554,49 +554,40 @@ item
 }
 
 async function makeCartData(items){
-const result=await Promise.all(items.map(resolveCartItem));
-const shopify={};
+const result=await Promise.all(items.map(resolveCartItem)),shopify={},woo={},destinations=[];
 
-result
-.filter(x=>x.kind==="shopify"&&x.available)
-.forEach(x=>{
-const g=shopify[x.origin]??={qty:{},items:[]};
+result.filter(x=>x.kind==="shopify"&&x.available).forEach(x=>{
+const g=shopify[x.origin]??={qty:{}};
 g.qty[x.id]=(g.qty[x.id]||0)+1;
-g.items.push(x.item);
 });
 
-const destinations=Object.entries(shopify).map(([o,g])=>({
+Object.entries(shopify).forEach(([o,g])=>destinations.push({
 kind:"cart",
 url:`${o}/cart/${Object.entries(g.qty).map(([id,n])=>`${id}:${n}`).join(",")}`
 }));
 
-result
-.filter(x=>x.kind==="woocommerce")
-.forEach(x=>destinations.push({
-kind:"cart",
-url:x.url
-}));
+result.filter(x=>x.kind==="woocommerce").forEach(x=>{
+const g=woo[x.url]??={count:0};
+g.count++;
+});
 
-result
-.filter(x=>x.kind==="page")
-.forEach(x=>destinations.push({
-kind:"page",
-url:x.url
-}));
+Object.entries(woo).forEach(([url,g])=>{
+const u=new URL(url);
+u.searchParams.set("quantity",g.count);
+destinations.push({kind:"cart",url:u.href});
+});
+
+[...new Set(result.filter(x=>x.kind==="page").map(x=>x.url))]
+.forEach(url=>destinations.push({kind:"page",url}));
 
 return{
-result,
 destinations,
 ordered:[
 ...result.filter(x=>x.kind==="shopify"&&x.available).map(x=>x.item),
 ...result.filter(x=>x.kind==="woocommerce").map(x=>x.item)
 ],
-soldOut:result
-.filter(x=>x.kind==="shopify"&&!x.available)
-.map(x=>x.item),
-unresolved:result
-.filter(x=>x.kind==="page")
-.map(x=>x.item)
+soldOut:result.filter(x=>x.kind==="shopify"&&!x.available).map(x=>x.item),
+unresolved:result.filter(x=>x.kind==="page").map(x=>x.item)
 };
 }
 
@@ -604,7 +595,8 @@ function recordOrderedList(ordered,soldOut){
 const pack=a=>a.map(i=>({
 group:i.group||"",
 sn:String(i.sn||"").trim(),
-name:String(i.name||"").trim()
+name:String(i.name||"").trim(),
+note:i.note||""
 }));
 
 const body=JSON.stringify({
@@ -613,17 +605,9 @@ ordered:pack(ordered),
 soldOut:pack(soldOut)
 });
 
-const blob=new Blob([body],{
-type:"text/plain;charset=utf-8"
-});
-
+const blob=new Blob([body],{type:"text/plain;charset=utf-8"});
 if(!navigator.sendBeacon||!navigator.sendBeacon(ORDER_API,blob))
-fetch(ORDER_API,{
-method:"POST",
-body,
-keepalive:true,
-mode:"no-cors"
-}).catch(()=>{});
+fetch(ORDER_API,{method:"POST",body,keepalive:true,mode:"no-cors"}).catch(()=>{});
 }
 
 async function handleFinalCheckout(){
@@ -634,101 +618,59 @@ btn.textContent="正在辨識購物車...";
 const spare=[];
 
 try{
+if(cart.some(i=>!i.url))throw new Error("有商品沒有商品網址");
 
-if(cart.some(i=>!i.url))
-throw new Error("有商品沒有商品網址");
+const uniqueUrls=[...new Set(cart.map(i=>i.url))];
 
-for(let i=1;i<cart.length;i++){
-
+for(let i=1;i<uniqueUrls.length;i++){
 const w=window.open("about:blank","_blank");
-
 if(!w){
-spare.forEach(x=>{
-try{x.close()}catch{}
-});
-
-throw new Error(
-"瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗"
-);
+spare.forEach(x=>{try{x.close()}catch{}});
+throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗");
 }
-
 spare.push(w);
 }
 
 const data=await makeCartData(cart);
+const manual=data.unresolved.map(i=>({...i,note:"🖥️"}));
 
-recordOrderedList(
-data.ordered,
-data.soldOut
-);
+recordOrderedList([...data.ordered,...manual],data.soldOut);
 
 data.soldOut.forEach(i=>{
-const key=i.sn
-?`S:${norm(i.sn)}`
-:`N:${norm(i.name)}`;
-
+const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
 soldOutCounts[key]=(soldOutCounts[key]||0)+1;
 });
 
 const used=data.destinations.slice(1);
+used.forEach((d,i)=>{if(spare[i])spare[i].location.href=d.url});
+spare.slice(used.length).forEach(w=>{try{w.close()}catch{}});
 
-used.forEach((d,i)=>{
-spare[i].location.href=d.url;
-});
-
-spare
-.slice(used.length)
-.forEach(w=>{
-try{w.close()}catch{}
-});
-
-const done=new Set([
-...data.ordered,
-...data.soldOut
-]);
-
-cart=cart.filter(i=>!done.has(i));
-
+cart=[];
 saveCart();
 updateCartUI();
+closeModal();
 
 if(!data.destinations.length){
-
-closeModal();
 renderItems();
-
-alert(
-data.soldOut.length
-?"購物車內商品目前都已缺貨，已記錄缺貨"
-:"沒有可處理的商品"
-);
-
+alert(data.soldOut.length?"購物車內商品目前都已缺貨，已記錄缺貨":"沒有可處理的商品");
+btn.disabled=false;
+btn.textContent="確認訂購";
 return;
 }
 
-if(data.unresolved.length){
-
-alert(
-`有 ${data.unresolved.length} 件商品無法自動辨識購物車，已直接開啟商品頁面，並保留在這裡的購物車`
-);
-
-}
+if(manual.length)alert(`有 ${manual.length} 件商品需手動下單，已開啟商品頁面、清空購物車並在已訂購清單備註 🖥️`);
 
 location.href=data.destinations[0].url;
 
 }catch(e){
-
-spare.forEach(w=>{
-try{w.close()}catch{}
-});
-
+spare.forEach(w=>{try{w.close()}catch{}});
 console.error(e);
 alert(e.message);
-
 btn.disabled=false;
 btn.textContent="確認訂購";
 }
 }
+
 
 (function(){
 const el=document.getElementById("cart-trigger");

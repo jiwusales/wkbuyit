@@ -151,7 +151,49 @@ function mergeLatestPrice(item,latest){
 const s=findStock(item,latest);
 return{...item,img:s?.img||item.img,originalPrice:s?.originalPrice||item.originalPrice||""};
 }
+const imageCache={};
 
+async function getProductImage(url){
+if(!url)return"";
+if(imageCache[url]!==undefined)return imageCache[url];
+
+try{
+const u=new URL(url),m=u.pathname.match(/\/products\/([^/?#]+)/);
+
+if(m){
+try{
+const r=await fetch(`${u.origin}/products/${m[1]}.js`);
+if(r.ok){
+const p=await r.json();
+const img=p.featured_image||p.images?.[0]||"";
+if(img)return imageCache[url]=String(img).replace(/^\/\//,"https://");
+}
+}catch{}
+}
+
+const r=await fetch(url);
+if(!r.ok)return imageCache[url]="";
+
+const html=await r.text();
+const d=new DOMParser().parseFromString(html,"text/html");
+const img=
+d.querySelector('meta[property="og:image:secure_url"]')?.content||
+d.querySelector('meta[property="og:image"]')?.content||
+d.querySelector('meta[name="twitter:image"]')?.content||
+"";
+
+return imageCache[url]=img?new URL(img,url).href:"";
+}catch{
+return imageCache[url]="";
+}
+}
+
+async function fillMissingImages(rows){
+await Promise.all(rows.map(async i=>{
+if(!i.img&&i.url)i.img=await getProductImage(i.url);
+}));
+return rows;
+}
 function filterNormal(rows,key){
 const ok=i=>["0","1"].includes(i.colStock);
 if(key==="chiikawa")return rows.filter(i=>i.name&&ok(i)&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
@@ -181,7 +223,7 @@ const latest=await getSheet("最新開團");
 rows=rows.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).map(i=>mergeLatestPrice(i,latest));
 rows=key==="latest"?rows.filter(i=>i.sn&&i.url):rows.filter(i=>!i.sn||!i.url);
 }else rows=filterNormal(rows,key);
-
+rows=await fillMissingImages(rows);
 allItems=rows.map(i=>({...i,
 category:key==="pending"?siteName(originOf(i.url)):(key==="latest"||key==="reminder")?(i.group||"其他"):(i.role||i.ip||i.group||"其他"),
 type:i.type||"其他"

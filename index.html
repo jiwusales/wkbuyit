@@ -275,7 +275,7 @@ document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;col
 function normalTab(){return["chiikawa","nagano","mogu"].includes(currentTab)}
 
 function renderRoleNav(){
-const cats=normalTab()?allCategories.filter(c=>!HIDE_ROLES.includes(c)):allCategories;
+const cats=allCategories;
 document.getElementById("dynamic-nav").innerHTML=cats.map(c=>`<a class="${selectedRole===c?"active-role":""}" onclick='toggleRole(${JSON.stringify(c)})'>${c}</a>`).join("");
 }
 
@@ -330,16 +330,10 @@ box.appendChild(g);
 };
 
 if(!selectedTypes.length&&!selectedRole){
-const hidden=[];
 
 allCategories.forEach(c=>{
 const a=items.filter(i=>i.category===c);
 if(!a.length)return;
-
-if(normalTab()&&HIDE_ROLES.includes(c)){
-hidden.push(...a);
-return;
-}
 
 const d=document.createElement("div");
 d.className="type-divider";
@@ -360,7 +354,6 @@ box.appendChild(d);
 grid(a);
 });
 
-if(hidden.length)grid(hidden);
 }else grid(items);
 }
 

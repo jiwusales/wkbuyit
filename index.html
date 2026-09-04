@@ -286,7 +286,7 @@ if(hidden.length)grid(hidden);
 function createCard(item,status=""){
 const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
 const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${!item.sn&&!item.url?"缺貨號、商品網址":!item.sn?"缺貨號":"缺商品網址"}</div>`:"";
-const warn=["chiikawa","nagano","mogu"].includes(currentTab)&&item.colStock==="1";
+const warn=normalTab()&&item.colStock==="1";
 const link=item.url?`<a class="product-link" href="${item.url}" target="_blank" onclick="event.stopPropagation()">商品頁面</a>`:"";
 
 c.className="card";
@@ -302,8 +302,7 @@ ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
 ${link}${miss}`;
 
 const btn=c.querySelector(".add-btn-tag");
-if(btn)btn.onclick=e=>addToCart(e,rem?{...item,useUrl:true}:item);
-
+if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
 c.onclick=()=>zoomCard(c);
 return c;
 }
@@ -390,117 +389,277 @@ document.getElementById("modal-total-price").textContent=`¥${fmt(cartInfo().tot
 document.getElementById("modal-shipping").innerHTML=shippingHtml();
 }
 
-async function getVariantInfo(item){
-if(!item.url)throw new Error(`${item.name} 沒有商品網址`);
+const CART_RULES={};
 
+function cartHost(url){
+try{return new URL(url).hostname.replace(/^www\./,"")}catch{return""}
+}
+
+async function tryShopify(item){
+try{
 const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
-if(!m)throw new Error(`${item.name} 商品網址無法辨識`);
+if(!m)return null;
 
 const r=await fetch(`${u.origin}/products/${m[1]}.js`);
-if(!r.ok)throw new Error(`${item.name} 無法讀取商品資料`);
+if(!r.ok)return null;
 
-const p=await r.json();
+const p=await r.json(),vs=p.variants||[],vid=u.searchParams.get("variant");
 let v;
 
-if(item.useUrl||u.origin===SITES.mogu){
-v=(p.variants||[]).find(x=>x.available!==false)||(p.variants||[])[0];
-}else{
-if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
-v=(p.variants||[]).find(x=>String(x.sku||"").trim()===String(item.sn).trim());
+if(vid)v=vs.find(x=>String(x.id)===String(vid));
+
+if(!v){
+if(item.urlOnly||item.useUrl||!item.sn)
+v=vs.find(x=>x.available!==false)||vs[0];
+else
+v=vs.find(x=>String(x.sku||"").trim()===String(item.sn).trim());
 }
 
-if(!v?.id)throw new Error(`${item.name} 找不到商品`);
-return{id:String(v.id),available:v.available!==false};
-}
-
-async function makeCartData(origin,items){
-const result=await Promise.all(items.map(async item=>({item,info:await getVariantInfo(item)})));
-const ordered=result.filter(x=>x.info.available).map(x=>x.item);
-const soldOut=result.filter(x=>!x.info.available).map(x=>x.item);
-const qty={};
-
-result.filter(x=>x.info.available).forEach(x=>qty[x.info.id]=(qty[x.info.id]||0)+1);
+if(!v?.id)return null;
 
 return{
-ordered,soldOut,
-url:ordered.length?`${origin}/cart/${Object.entries(qty).map(([id,n])=>`${id}:${n}`).join(",")}`:""
+kind:"shopify",
+origin:u.origin,
+id:String(v.id),
+available:v.available!==false,
+item
+};
+
+}catch{
+return null;
+}
+}
+
+async function tryWooCommerce(item){
+try{
+const u=new URL(item.url);
+const direct=u.searchParams.get("add-to-cart");
+
+if(direct)return{
+kind:"woocommerce",
+url:item.url,
+item
+};
+
+const r=await fetch(item.url);
+if(!r.ok)return null;
+
+const html=await r.text();
+
+const id=
+html.match(/name=["']add-to-cart["'][^>]*value=["'](\d+)/i)?.[1]||
+html.match(/value=["'](\d+)["'][^>]*name=["']add-to-cart["']/i)?.[1];
+
+if(!id)return null;
+
+return{
+kind:"woocommerce",
+url:`${u.origin}/?add-to-cart=${id}&quantity=1`,
+item
+};
+
+}catch{
+return null;
+}
+}
+
+async function resolveCartItem(item){
+if(!item.url)return{kind:"missing",item};
+
+const host=cartHost(item.url);
+
+if(CART_RULES[host]){
+try{
+const x=await CART_RULES[host](item);
+if(x)return x;
+}catch{}
+}
+
+const shopify=await tryShopify(item);
+if(shopify)return shopify;
+
+const woo=await tryWooCommerce(item);
+if(woo)return woo;
+
+return{
+kind:"page",
+url:item.url,
+item
+};
+}
+
+async function makeCartData(items){
+const result=await Promise.all(items.map(resolveCartItem));
+const shopify={};
+
+result
+.filter(x=>x.kind==="shopify"&&x.available)
+.forEach(x=>{
+const g=shopify[x.origin]??={qty:{},items:[]};
+g.qty[x.id]=(g.qty[x.id]||0)+1;
+g.items.push(x.item);
+});
+
+const destinations=Object.entries(shopify).map(([o,g])=>({
+kind:"cart",
+url:`${o}/cart/${Object.entries(g.qty).map(([id,n])=>`${id}:${n}`).join(",")}`
+}));
+
+result
+.filter(x=>x.kind==="woocommerce")
+.forEach(x=>destinations.push({
+kind:"cart",
+url:x.url
+}));
+
+result
+.filter(x=>x.kind==="page")
+.forEach(x=>destinations.push({
+kind:"page",
+url:x.url
+}));
+
+return{
+result,
+destinations,
+ordered:[
+...result.filter(x=>x.kind==="shopify"&&x.available).map(x=>x.item),
+...result.filter(x=>x.kind==="woocommerce").map(x=>x.item)
+],
+soldOut:result
+.filter(x=>x.kind==="shopify"&&!x.available)
+.map(x=>x.item),
+unresolved:result
+.filter(x=>x.kind==="page")
+.map(x=>x.item)
 };
 }
 
 function recordOrderedList(ordered,soldOut){
-const pack=a=>a.map(i=>({group:i.group||"",sn:String(i.sn||"").trim(),name:String(i.name||"").trim()}));
-const body=JSON.stringify({action:"recordOrder",ordered:pack(ordered),soldOut:pack(soldOut)});
-const blob=new Blob([body],{type:"text/plain;charset=utf-8"});
+const pack=a=>a.map(i=>({
+group:i.group||"",
+sn:String(i.sn||"").trim(),
+name:String(i.name||"").trim()
+}));
+
+const body=JSON.stringify({
+action:"recordOrder",
+ordered:pack(ordered),
+soldOut:pack(soldOut)
+});
+
+const blob=new Blob([body],{
+type:"text/plain;charset=utf-8"
+});
 
 if(!navigator.sendBeacon||!navigator.sendBeacon(ORDER_API,blob))
-fetch(ORDER_API,{method:"POST",body,keepalive:true,mode:"no-cors"}).catch(()=>{});
+fetch(ORDER_API,{
+method:"POST",
+body,
+keepalive:true,
+mode:"no-cors"
+}).catch(()=>{});
 }
 
 async function handleFinalCheckout(){
 const btn=document.getElementById("send-btn");
 btn.disabled=true;
-btn.textContent="正在加入官網購物車...";
+btn.textContent="正在辨識購物車...";
 
-const opened={};
+const spare=[];
 
 try{
-if(cart.some(i=>!i.url||(!i.useUrl&&originOf(i.url)!==SITES.mogu&&!i.sn)))
-throw new Error("有商品缺少加入購物車需要的資料");
 
-const groups={};
-cart.forEach(i=>{
-const o=originOf(i.url);
-if(!o)throw new Error(`${i.name} 商品網址錯誤`);
-(groups[o]??=[]).push(i);
-});
+if(cart.some(i=>!i.url))
+throw new Error("有商品沒有商品網址");
 
-const origins=Object.keys(groups);
+for(let i=1;i<cart.length;i++){
 
-origins.slice(1).forEach(o=>{
 const w=window.open("about:blank","_blank");
-if(!w)throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗");
-opened[o]=w;
+
+if(!w){
+spare.forEach(x=>{
+try{x.close()}catch{}
 });
 
-const data={};
-await Promise.all(origins.map(async o=>data[o]=await makeCartData(o,groups[o])));
+throw new Error(
+"瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗"
+);
+}
 
-const ordered=origins.flatMap(o=>data[o].ordered);
-const soldOut=origins.flatMap(o=>data[o].soldOut);
-const availableOrigins=origins.filter(o=>data[o].url);
+spare.push(w);
+}
 
-recordOrderedList(ordered,soldOut);
+const data=await makeCartData(cart);
 
-if(!availableOrigins.length){
-Object.values(opened).forEach(w=>{try{w.close()}catch{}});
+recordOrderedList(
+data.ordered,
+data.soldOut
+);
 
-soldOut.forEach(i=>{
-const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+data.soldOut.forEach(i=>{
+const key=i.sn
+?`S:${norm(i.sn)}`
+:`N:${norm(i.name)}`;
+
 soldOutCounts[key]=(soldOutCounts[key]||0)+1;
 });
 
-cart=[];saveCart();closeModal();updateCartUI();renderItems();
-alert("購物車內商品目前都已缺貨，已記錄缺貨");
-btn.disabled=false;
-btn.textContent="確認訂購";
+const used=data.destinations.slice(1);
+
+used.forEach((d,i)=>{
+spare[i].location.href=d.url;
+});
+
+spare
+.slice(used.length)
+.forEach(w=>{
+try{w.close()}catch{}
+});
+
+const done=new Set([
+...data.ordered,
+...data.soldOut
+]);
+
+cart=cart.filter(i=>!done.has(i));
+
+saveCart();
+updateCartUI();
+
+if(!data.destinations.length){
+
+closeModal();
+renderItems();
+
+alert(
+data.soldOut.length
+?"購物車內商品目前都已缺貨，已記錄缺貨"
+:"沒有可處理的商品"
+);
+
 return;
 }
 
-const main=availableOrigins[0];
+if(data.unresolved.length){
 
-origins.slice(1).forEach(o=>{
-if(o===main||!data[o].url){
-try{opened[o]?.close()}catch{}
-}else opened[o].location.href=data[o].url;
-});
+alert(
+`有 ${data.unresolved.length} 件商品無法自動辨識購物車，已直接開啟商品頁面，並保留在這裡的購物車`
+);
 
-cart=[];saveCart();
-location.href=data[main].url;
+}
+
+location.href=data.destinations[0].url;
 
 }catch(e){
-Object.values(opened).forEach(w=>{try{w.close()}catch{}});
+
+spare.forEach(w=>{
+try{w.close()}catch{}
+});
+
 console.error(e);
 alert(e.message);
+
 btn.disabled=false;
 btn.textContent="確認訂購";
 }

@@ -83,26 +83,52 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 </div></div>
 
 <script>
-const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",FREE_SHIPPING=11000,IMG="https://i.postimg.cc/bv5xRs04/image.png";
+const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",IMG="https://i.postimg.cc/bv5xRs04/image.png";
 const ORDER_API="https://script.google.com/macros/s/AKfycbz2MEC8O7cjxRLb3xQMGnOLlzfoPc8E_-PDnXjb8sCFph1oLvBAnY30y6OyzcA8iSVt/exec";
 const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop"},ALLOWED=Object.values(SITES);
 const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
 const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 
-let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={};
+let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
 function getV(r,i){if(i<0||!r.c||!r.c[i])return"";const c=r.c[i];return String(c.v??c.f??"").trim()}
 function originOf(u){try{return new URL(u).origin}catch{return""}}
-function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"ナガノ":o===SITES.mogu?"もぐもぐ本舖":o||"未知官網"}
+function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"ナガノ":o===SITES.mogu?"もぐもぐ本舖":hostKey(o)||"未知官網"}
 function yen(v){const n=Number(String(v||"").replace(/[^\d.-]/g,""));return Number.isFinite(n)?n:0}
 function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
 function buyerText(i){return`${i.source?`(${i.source})`:""}${i.customer||""}`}
 function norm(v){return String(v||"").replace(/\s+/g,"").trim()}
 function productText(i){const n=String(i.name||"").trim(),r=String(i.role||"").trim();return!r||HIDE_ROLES.includes(r)||norm(n).includes(norm(r))?n:`${n} ${r}`}
+
+function hostKey(v){
+try{
+let s=String(v||"").trim();
+if(!/^https?:\/\//i.test(s))s="https://"+s;
+return new URL(s).hostname.replace(/^www\./,"").toLowerCase();
+}catch{return String(v||"").trim().replace(/^www\./,"").toLowerCase().split("/")[0]}
+}
+
+async function loadShippingSettings(){
+try{
+const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("網站運費")}&headers=1`;
+const t=await fetch(url).then(r=>r.text()),d=JSON.parse(t.substr(47).slice(0,-2)),L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
+const U=col(L,"網址"),F=col(L,"免運金額"),S=col(L,"運費"),N=col(L,"備註");
+if(U<0||F<0||S<0||N<0)throw new Error("網站運費分頁缺少「網址、免運金額、運費、備註」欄位");
+const map={};
+(d.table.rows||[]).forEach(r=>{
+const host=hostKey(getV(r,U));
+if(host)map[host]={free:getV(r,F),shipping:getV(r,S),note:getV(r,N)};
+});
+shippingSettings=map;
+}catch(e){
+console.error("網站運費載入失敗",e);
+shippingSettings={};
+}
+}
 
 function renderTabs(){
 document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("");
@@ -419,8 +445,22 @@ function shippingHtml(){
 const {groups}=cartInfo();
 if(!Object.keys(groups).length)return"尚未加入商品";
 return Object.entries(groups).map(([o,g])=>{
-const d=Math.max(0,FREE_SHIPPING-g.total),warn=g.missing?` <span style="color:#aaa">(${g.missing}件無原價)</span>`:"";
-return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br>${d?`還差 <b>¥${fmt(d)}</b> 免運`:`<b>✓ 已達免運</b>`}${warn}</div>`;
+const cfg=shippingSettings[hostKey(o)],warn=g.missing?` <span style="color:#aaa">(${g.missing}件無原價)</span>`:"";
+if(!cfg)return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br><span style="color:#aaa">找不到運費設定</span>${warn}</div>`;
+
+const freeRaw=String(cfg.free||"").trim(),fee=yen(cfg.shipping),note=String(cfg.note||"").trim();
+let info="";
+
+if(/^x$/i.test(freeRaw)){
+info=fee?`運費 <b>¥${fmt(fee)}</b>`:"運費未設定";
+}else{
+const free=yen(freeRaw);
+if(!free)info=fee?`運費 <b>¥${fmt(fee)}</b>　<span style="color:#aaa">免運金額未設定</span>`:"運費、免運金額未設定";
+else if(g.total>=free)info="<b>✓ 已達免運</b>";
+else info=`${fee?`運費 <b>¥${fmt(fee)}</b>　`:"運費未設定　"}還差 <b>¥${fmt(free-g.total)}</b> 免運`;
+}
+
+return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br>${info}${warn}${note?`<br><span style="color:#888">${note}</span>`:""}</div>`;
 }).join("<hr style='border:0;border-top:1px solid #eee'>");
 }
 
@@ -713,8 +753,9 @@ el.addEventListener("mousedown",start);
 el.addEventListener("touchstart",start,{passive:false});
 })();
 
-window.onload=()=>{
+window.onload=async()=>{
 renderTabs();
+await loadShippingSettings();
 updateCartUI();
 switchTab("pending");
 };

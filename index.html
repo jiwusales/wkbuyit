@@ -294,14 +294,16 @@ c.innerHTML=
 `${status==="ordered"?'<div class="ordered-tag">✓</div>':""}
 ${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
 ${warn?'<div class="stock-warning">⚠️</div>':""}
-${rem?"":'<div class="add-btn-tag">＋</div>'}
+${(!rem||item.url)?'<div class="add-btn-tag">＋</div>':""}
 <img src="${item.img||IMG}">
 ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
 <div class="name" title="${productText(item)}">${productText(item)}</div>
 <div class="price">${priceText(item.originalPrice)}</div>
 ${link}${miss}`;
 
-if(!rem)c.querySelector(".add-btn-tag").onclick=e=>addToCart(e,item);
+const btn=c.querySelector(".add-btn-tag");
+if(btn)btn.onclick=e=>addToCart(e,rem?{...item,useUrl:true}:item);
+
 c.onclick=()=>zoomCard(c);
 return c;
 }
@@ -400,8 +402,8 @@ if(!r.ok)throw new Error(`${item.name} 無法讀取商品資料`);
 const p=await r.json();
 let v;
 
-if(u.origin===SITES.mogu){
-v=(p.variants||[])[0];
+if(item.useUrl||u.origin===SITES.mogu){
+v=(p.variants||[]).find(x=>x.available!==false)||(p.variants||[])[0];
 }else{
 if(!item.sn)throw new Error(`${item.name} 沒有貨號`);
 v=(p.variants||[]).find(x=>String(x.sku||"").trim()===String(item.sn).trim());
@@ -442,7 +444,7 @@ btn.textContent="正在加入官網購物車...";
 const opened={};
 
 try{
-if(cart.some(i=>!i.url||(originOf(i.url)!==SITES.mogu&&!i.sn)))
+if(cart.some(i=>!i.url||(!i.useUrl&&originOf(i.url)!==SITES.mogu&&!i.sn)))
 throw new Error("有商品缺少加入購物車需要的資料");
 
 const groups={};

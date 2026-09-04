@@ -90,7 +90,8 @@ const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
 const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 
-let currentTab="pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={};
+let savedTab=localStorage.getItem("jiwu_helper_tab");
+let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
@@ -230,6 +231,8 @@ return rows.filter(i=>i.name&&ok(i)&&i.ip==="ちいかわ"&&originOf(i.url)===SI
 
 async function switchTab(key){
 currentTab=key;selectedTypes=[];selectedRole=null;
+localStorage.setItem("jiwu_helper_tab",key);
+window.scrollTo(0,0);
 document.body.classList.toggle("latest-tab",key==="latest"||key==="reminder");
 renderTabs();
 
@@ -746,11 +749,15 @@ el.addEventListener("mousedown",start);
 el.addEventListener("touchstart",start,{passive:false});
 })();
 
+if("scrollRestoration" in history)history.scrollRestoration="manual";
+
 window.onload=async()=>{
+window.scrollTo(0,0);
 renderTabs();
 await loadShippingSettings();
 updateCartUI();
-switchTab("pending");
+await switchTab(currentTab);
+window.scrollTo(0,0);
 };
 </script>
 </body>

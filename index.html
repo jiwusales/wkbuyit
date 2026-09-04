@@ -20,7 +20,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .nav-arrow{width:24px;font-size:16px;cursor:pointer;flex-shrink:0;color:#bbb}
 #card-container{padding:158px 10px 10px}.type-divider{display:flex;align-items:center;justify-content:center;margin:15px 0 8px;font-weight:bold;font-size:16px}
 .type-divider::before,.type-divider::after{content:"";flex:1;border-top:1px solid #ddd;margin:0 10px}
-.category-add-all{border:0;background:var(--theme);color:#fff;border-radius:6px;padding:4px 7px;font-size:9px;font-weight:bold;cursor:pointer;margin-left:6px}
+.category-add-all{background:#fff;border:1px solid var(--theme);color:var(--active);border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer;margin-left:6px}
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
@@ -325,7 +325,7 @@ d.appendChild(title);
 if(["pending","latest","reminder"].includes(currentTab)){
 const btn=document.createElement("button");
 btn.className="category-add-all";
-btn.textContent="全品項＋";
+btn.textContent="➕";
 btn.onclick=e=>addCategoryToCart(e,c);
 d.appendChild(btn);
 }

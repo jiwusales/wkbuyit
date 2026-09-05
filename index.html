@@ -147,18 +147,17 @@ async function loadOrderedCounts(){
 const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("已訂購清單")}&headers=1`;
 const t=await fetch(url).then(r=>r.text()),d=JSON.parse(t.substr(47).slice(0,-2));
 const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
-const T=col(L,"時間"),S=col(L,"貨號"),N=col(L,"名稱"),Q=col(L,"數量"),O=col(L,"缺貨"),rows=d.table.rows||[];
-
-let latest="";
-rows.forEach(r=>{const x=getV(r,T);if(x)latest=x});
-
+const S=col(L,"貨號"),N=col(L,"名稱"),Q=col(L,"數量"),O=col(L,"缺貨");
 const ok={},bad={};
-rows.forEach(r=>{
-if(getV(r,T)!==latest)return;
-const sn=getV(r,S),name=getV(r,N),key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
+
+(d.table.rows||[]).forEach(r=>{
+const sn=getV(r,S),name=getV(r,N);
+if(!sn&&!name)return;
+const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
 ok[key]=(ok[key]||0)+(Number(getV(r,Q))||0);
 bad[key]=(bad[key]||0)+(Number(getV(r,O))||0);
 });
+
 orderedCounts=ok;
 soldOutCounts=bad;
 }

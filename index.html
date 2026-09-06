@@ -178,6 +178,7 @@ function mergeLatestPrice(item,latest){
 const s=findStock(item,latest);
 return{...item,img:s?.img||item.img,originalPrice:s?.originalPrice||item.originalPrice||""};
 }
+
 const imageCache={};
 
 async function getProductImage(url){
@@ -221,6 +222,7 @@ if(!i.img&&i.url)i.img=await getProductImage(i.url);
 }));
 return rows;
 }
+
 function filterNormal(rows,key){
 const ok=i=>["0","1"].includes(i.colStock);
 if(key==="chiikawa")return rows.filter(i=>i.name&&ok(i)&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
@@ -246,15 +248,36 @@ await loadOrderedCounts();
 if(key==="pending"){
 stock=await getSheet("商品庫存");
 rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).filter(i=>ALLOWED.includes(originOf(i.url)));
+
 }else if(key==="latest"||key==="reminder"){
 stock=await getSheet("商品庫存");
 const latest=await getSheet("最新開團");
-rows=rows.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).map(i=>mergeLatestPrice(i,latest));
-rows=key==="latest"?rows.filter(i=>i.sn&&i.url):rows.filter(i=>!i.sn||!i.url);
+
+rows=rows
+.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
+.map(i=>mergeStock(i,stock))
+.map(i=>mergeLatestPrice(i,latest));
+
+const latestGroups=new Set(
+rows.filter(i=>i.group&&i.sn&&i.url).map(i=>norm(i.group))
+);
+
+if(key==="latest"){
+rows=rows.filter(i=>i.group?latestGroups.has(norm(i.group)):i.sn&&i.url);
+}else{
+rows=rows.filter(i=>i.group?!latestGroups.has(norm(i.group)):!i.sn||!i.url);
+}
+
 }else rows=filterNormal(rows,key);
+
 rows=await fillMissingImages(rows);
+
 allItems=rows.map(i=>({...i,
-category:key==="pending"?siteName(originOf(i.url)):(key==="latest"||key==="reminder")?(i.group||"其他"):(i.role||i.ip||i.group||"其他"),
+category:key==="pending"
+?siteName(originOf(i.url))
+:(key==="latest"||key==="reminder")
+?(i.group||"其他")
+:(i.role||i.ip||i.group||"其他"),
 type:i.type||"其他"
 }));
 
@@ -309,12 +332,13 @@ return;
 }
 
 const remain={...orderedCounts};
+const showOrdered=["pending","latest","reminder"].includes(currentTab);
 
 const card=i=>{
 const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
 let status="";
 
-if((remain[key]||0)>0){
+if(showOrdered&&(remain[key]||0)>0){
 status="ordered";
 remain[key]--;
 }else if((soldOutCounts[key]||0)>0){
@@ -692,7 +716,9 @@ btn.disabled=false;
 btn.textContent="確認訂購";
 return;
 }
+
 location.href=data.destinations[0].url;
+
 }catch(e){
 spare.forEach(w=>{try{w.close()}catch{}});
 console.error(e);
@@ -701,7 +727,6 @@ btn.disabled=false;
 btn.textContent="確認訂購";
 }
 }
-
 
 (function(){
 const el=document.getElementById("cart-trigger");
@@ -722,7 +747,9 @@ const p=e.touches?e.touches[0]:e,dx=p.clientX-sx,dy=p.clientY-sy;
 if(Math.abs(dx)>5||Math.abs(dy)>5){
 drag=true;
 if(e.cancelable)e.preventDefault();
-el.style.left=ix+dx+"px";el.style.top=iy+dy+"px";el.style.right="auto";
+el.style.left=ix+dx+"px";
+el.style.top=iy+dy+"px";
+el.style.right="auto";
 }
 }
 

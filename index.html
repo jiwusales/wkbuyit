@@ -519,7 +519,7 @@ const btn=document.createElement("button");btn.className="category-add-all";btn.
 
 if(planGroup(a)){
 const input=document.createElement("input");
-input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="娃限購";input.title="只限制吊娃／娃，每車可放 1 或 2 個";input.value=orderLimits[c]||"";d.appendChild(input);
+input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder=" ";input.title="只限制吊娃／娃，每車可放 1 或 2 個";input.value=orderLimits[c]||"";d.appendChild(input);
 
 const confirmBtn=document.createElement("button");
 confirmBtn.className="order-limit-confirm";confirmBtn.textContent="確認";d.appendChild(confirmBtn);

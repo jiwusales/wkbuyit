@@ -514,7 +514,7 @@ const btn=document.createElement("button");btn.className="category-add-all";btn.
 
 if(planGroup(a)){
 const input=document.createElement("input");
-input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="娃限購";input.title="吊娃／娃每車限購數量";input.value=orderLimits[c]||"";d.appendChild(input);
+input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="數量";input.title="吊娃／娃每車限購數量";input.value=orderLimits[c]||"";d.appendChild(input);
 box.appendChild(d);
 
 input.oninput=()=>{

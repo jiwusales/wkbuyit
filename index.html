@@ -21,6 +21,14 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 #card-container{padding:158px 10px 10px}.type-divider{display:flex;align-items:center;justify-content:center;margin:15px 0 8px;font-weight:bold;font-size:16px}
 .type-divider::before,.type-divider::after{content:"";flex:1;border-top:1px solid #ddd;margin:0 10px}
 .category-add-all{background:#fff;border:1px solid var(--theme);color:var(--active);border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer;margin-left:6px}
+.order-limit-input{width:72px;height:24px;margin-left:6px;border:1px solid var(--theme);border-radius:6px;padding:2px 6px;font-size:10px;text-align:center;color:#555;background:#fff}
+.auto-order-wrap{margin:0 0 10px}
+.auto-order-car{max-width:900px;margin:6px auto;padding:8px 10px;background:#fff;border:1px solid var(--theme);border-radius:8px;text-align:left;font-size:11px}
+.auto-order-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:bold}
+.auto-order-add{margin-left:auto;background:var(--theme);color:#fff;border:0;border-radius:6px;padding:5px 9px;font-size:10px;cursor:pointer}
+.auto-order-items{margin-top:5px;color:#777;line-height:1.5}
+.auto-order-ok{color:#55a36a}.auto-order-warn{color:#e78655}
+
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
@@ -91,7 +99,7 @@ const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族"
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 
 let savedTab=localStorage.getItem("jiwu_helper_tab");
-let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={};
+let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={},orderLimits={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
@@ -319,6 +327,73 @@ selectedTypes=selectedTypes.includes(t)?selectedTypes.filter(x=>x!==t):[...selec
 renderFilters();renderItems();
 }
 
+const ORDER_TARGET=11000;
+
+function itemOrderKey(i){
+return norm(i.sn)||norm(`${i.name}|${i.role}`);
+}
+
+function isLimitedDoll(i){
+return /(吊娃|娃娃|娃|マスコット|ぬいぐるみ|ぬい)/i.test(`${i.type||""} ${i.name||""}`);
+}
+
+function makeOrderPlan(items,limit){
+limit=Math.max(1,Math.min(2,Number(limit)||1));
+const usable=items.filter(i=>i.url),limited=usable.filter(isLimitedDoll),regular=usable.filter(i=>!isLimitedDoll(i));
+if(!usable.length)return[];
+
+const groups={};
+limited.forEach(i=>(groups[itemOrderKey(i)]??=[]).push(i));
+
+const total=usable.reduce((s,i)=>s+yen(i.originalPrice),0);
+const limitCars=Math.max(1,...Object.values(groups).map(a=>Math.ceil(a.length/limit)));
+const amountCars=Math.max(1,Math.floor(total/ORDER_TARGET));
+const cars=Array.from({length:Math.max(limitCars,amountCars)},()=>({items:[],total:0,counts:{}}));
+
+Object.values(groups).sort((a,b)=>b.length-a.length).forEach(a=>{
+a.sort((x,y)=>yen(y.originalPrice)-yen(x.originalPrice)).forEach(i=>{
+const k=itemOrderKey(i);
+const c=cars.filter(x=>(x.counts[k]||0)<limit).sort((a,b)=>a.total-b.total)[0];
+if(!c)return;
+c.items.push(i);c.total+=yen(i.originalPrice);c.counts[k]=(c.counts[k]||0)+1;
+});
+});
+
+regular.sort((a,b)=>yen(b.originalPrice)-yen(a.originalPrice)).forEach(i=>{
+const c=[...cars].sort((a,b)=>a.total-b.total)[0];
+c.items.push(i);c.total+=yen(i.originalPrice);
+});
+
+return cars.filter(c=>c.items.length);
+}
+
+function addPlannedCart(items,btn){
+cart.push(...items);saveCart();updateCartUI();
+btn.textContent=`✓ 已加入 ${items.length}件`;
+setTimeout(()=>btn.textContent="＋ 加入這車",1000);
+}
+
+function renderOrderPlan(box,items,limit){
+box.innerHTML="";
+if(!limit)return;
+
+const cars=makeOrderPlan(items,limit);
+if(!cars.length){
+box.innerHTML="<div style='font-size:11px;color:#999'>沒有可排單商品</div>";
+return;
+}
+
+cars.forEach((c,n)=>{
+const d=document.createElement("div");
+d.className="auto-order-car";
+const ok=c.total>=ORDER_TARGET;
+const names=c.items.map(i=>`${buyerText(i)?buyerText(i)+" ":""}${productText(i)}`).join("、");
+d.innerHTML=`<div class="auto-order-head"><span>第 ${n+1} 車</span><span>${c.items.length}件</span><span>¥${fmt(c.total)}</span><span class="${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`}</span><button class="auto-order-add">＋ 加入這車</button></div><div class="auto-order-items">${names}</div>`;
+d.querySelector(".auto-order-add").onclick=e=>addPlannedCart(c.items,e.currentTarget);
+box.appendChild(d);
+});
+}
+
 function renderItems(){
 const box=document.getElementById("items-wrapper");
 box.innerHTML="";
@@ -374,6 +449,35 @@ btn.className="category-add-all";
 btn.textContent="➕";
 btn.onclick=e=>addCategoryToCart(e,c);
 d.appendChild(btn);
+
+if(currentTab==="latest"&&c.includes("吉伊新品")){
+const input=document.createElement("input");
+input.className="order-limit-input";
+input.type="number";
+input.min="1";
+input.max="2";
+input.inputMode="numeric";
+input.placeholder="娃限購 1/2";
+input.value=orderLimits[c]||"";
+d.appendChild(input);
+
+const plan=document.createElement("div");
+plan.className="auto-order-wrap";
+
+input.oninput=()=>{
+let v=String(input.value||"").replace(/[^12]/g,"");
+if(v.length>1)v=v.slice(-1);
+input.value=v;
+orderLimits[c]=v;
+renderOrderPlan(plan,a,v);
+};
+
+box.appendChild(d);
+box.appendChild(plan);
+if(input.value)renderOrderPlan(plan,a,input.value);
+grid(a);
+return;
+}
 }
 
 box.appendChild(d);

@@ -29,6 +29,8 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .auto-order-meta{display:flex;align-items:center;gap:8px;margin:0 0 4px 2px;font-size:10px;color:#777}
 .auto-order-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 @media(min-width:480px){.auto-order-grid{grid-template-columns:repeat(auto-fill,120px)}}
+.auto-order-grid.drag-over{outline:2px dashed var(--active);outline-offset:3px;border-radius:8px;background:#f8f3ff}
+.auto-order-grid .card{cursor:grab}.auto-order-grid .card:active{cursor:grabbing}.auto-order-grid .card.dragging{opacity:.35}
 .auto-order-add{width:30px;min-width:30px;height:30px;border:0;border-radius:8px;background:var(--theme);color:#fff;font-size:17px;font-weight:bold;cursor:pointer;margin-top:50px}
 .auto-order-ok{color:#55a36a;font-weight:bold}.auto-order-warn{color:#e78655;font-weight:bold}
 
@@ -102,7 +104,7 @@ const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族"
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 
 let savedTab=localStorage.getItem("jiwu_helper_tab");
-let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={},orderLimits=JSON.parse(localStorage.getItem("jiwu_helper_order_limits")||"{}");
+let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={},orderLimits={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
@@ -258,7 +260,11 @@ await loadOrderedCounts();
 
 if(key==="pending"){
 stock=await getSheet("商品庫存");
-rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock)).filter(i=>ALLOWED.includes(originOf(i.url)));
+rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock));
+const groupSite={};
+rows.forEach(i=>{const o=originOf(i.url);if(i.group&&ALLOWED.includes(o))groupSite[norm(i.group)]=o});
+rows=rows.filter(i=>ALLOWED.includes(originOf(i.url))||(i.group&&groupSite[norm(i.group)]))
+.map(i=>({...i,_siteOrigin:originOf(i.url)||groupSite[norm(i.group)]||""}));
 
 }else if(key==="latest"||key==="reminder"){
 stock=await getSheet("商品庫存");
@@ -285,7 +291,7 @@ rows=await fillMissingImages(rows);
 
 allItems=rows.map(i=>({...i,
 category:key==="pending"
-?siteName(originOf(i.url))
+?siteName(i._siteOrigin||originOf(i.url))
 :(key==="latest"||key==="reminder")
 ?(i.group||"其他")
 :(i.role||i.ip||i.group||"其他"),
@@ -332,213 +338,201 @@ renderFilters();renderItems();
 
 const ORDER_TARGET=11000;
 
-function saveOrderLimits(){localStorage.setItem("jiwu_helper_order_limits",JSON.stringify(orderLimits))}
 function isAutoOrderItem(i){return ALLOWED.includes(originOf(i.url))}
-function planGroup(items){return ["pending","latest","reminder"].includes(currentTab)&&items.some(isAutoOrderItem)}
+function isTmall(i){return /天貓/.test(String(i.name||""))}
+function planGroup(items){return ["pending","latest","reminder"].includes(currentTab)&&items.some(i=>isAutoOrderItem(i)&&!isTmall(i))}
 function itemOrderKey(i){return norm(i.sn)||norm(`${i.name}|${i.role}`)}
 function isLimitedDoll(i){return /(吊娃|娃娃|娃|マスコット|ぬいぐるみ|ぬい)/i.test(`${i.type||""} ${i.name||""}`)}
 function itemCartLimit(i,dollLimit){return isLimitedDoll(i)?Math.max(1,Math.min(2,Number(dollLimit)||1)):1}
 
-function makeOrderPlan(items,dollLimit){
-const usable=items.filter(i=>i.url);
-if(!usable.length)return[];
-
-const byKey={};
-usable.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
-
-const total=usable.reduce((s,i)=>s+yen(i.originalPrice),0);
-const minCars=Math.max(1,...Object.values(byKey).map(a=>Math.ceil(a.length/itemCartLimit(a[0],dollLimit))));
-const maxCars=Math.max(1,Math.floor(total/ORDER_TARGET));
-const carCount=Math.max(minCars,maxCars);
-
+function buildPlanAttempt(items,dollLimit,carCount,randomize=false){
 const cars=Array.from({length:carCount},()=>({items:[],total:0,counts:{}}));
-
-const groups=Object.values(byKey).sort((a,b)=>{
-const qa=Math.ceil(a.length/itemCartLimit(a[0],dollLimit));
-const qb=Math.ceil(b.length/itemCartLimit(b[0],dollLimit));
-return qb-qa||Math.max(...b.map(x=>yen(x.originalPrice)))-Math.max(...a.map(x=>yen(x.originalPrice)));
+const byKey={};
+items.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
+let groups=Object.values(byKey).map(a=>[...a]);
+if(randomize)groups.sort(()=>Math.random()-.5);
+groups.sort((a,b)=>{
+const qa=Math.ceil(a.length/itemCartLimit(a[0],dollLimit)),qb=Math.ceil(b.length/itemCartLimit(b[0],dollLimit));
+return qb-qa||b.length-a.length||Math.max(...b.map(x=>yen(x.originalPrice)))-Math.max(...a.map(x=>yen(x.originalPrice)));
 });
 
 groups.forEach(group=>{
-group.sort((a,b)=>yen(b.originalPrice)-yen(a.originalPrice));
+if(randomize)group.sort(()=>Math.random()-.5);else group.sort((a,b)=>yen(b.originalPrice)-yen(a.originalPrice));
 group.forEach(i=>{
 const k=itemOrderKey(i),limit=itemCartLimit(i,dollLimit);
 let choices=cars.filter(c=>(c.counts[k]||0)<limit);
 if(!choices.length)return;
 choices.sort((a,b)=>{
-const ad=a.total<ORDER_TARGET?0:1,bd=b.total<ORDER_TARGET?0:1;
-return ad-bd||a.total-b.total;
+const ad=Math.max(0,ORDER_TARGET-a.total),bd=Math.max(0,ORDER_TARGET-b.total);
+const as=Math.abs(ad-yen(i.originalPrice)),bs=Math.abs(bd-yen(i.originalPrice));
+if(a.total<ORDER_TARGET&&b.total>=ORDER_TARGET)return-1;
+if(b.total<ORDER_TARGET&&a.total>=ORDER_TARGET)return 1;
+return as-bs||a.total-b.total||(randomize?Math.random()-.5:0);
 });
 const c=choices[0];
-c.items.push(i);
-c.total+=yen(i.originalPrice);
-c.counts[k]=(c.counts[k]||0)+1;
+c.items.push(i);c.total+=yen(i.originalPrice);c.counts[k]=(c.counts[k]||0)+1;
 });
 });
-
-for(let pass=0;pass<200;pass++){
-const low=cars.filter(c=>c.total<ORDER_TARGET).sort((a,b)=>a.total-b.total)[0];
-if(!low)break;
-
-let moved=false;
-const donors=cars.filter(c=>c!==low&&c.total>ORDER_TARGET).sort((a,b)=>b.total-a.total);
-
-for(const donor of donors){
-const options=donor.items
-.map((i,idx)=>({i,idx,p:yen(i.originalPrice),k:itemOrderKey(i),limit:itemCartLimit(i,dollLimit)}))
-.filter(x=>(low.counts[x.k]||0)<x.limit&&donor.total-x.p>=ORDER_TARGET)
-.sort((a,b)=>Math.abs((low.total+a.p)-ORDER_TARGET)-Math.abs((low.total+b.p)-ORDER_TARGET));
-
-if(!options.length)continue;
-const x=options[0];
-donor.items.splice(x.idx,1);
-donor.total-=x.p;
-donor.counts[x.k]--;
-low.items.push(x.i);
-low.total+=x.p;
-low.counts[x.k]=(low.counts[x.k]||0)+1;
-moved=true;
-break;
-}
-if(!moved)break;
+return cars;
 }
 
-return cars.filter(c=>c.items.length);
+function planScore(cars){
+const under=cars.filter(c=>c.total<ORDER_TARGET),def=under.reduce((s,c)=>s+ORDER_TARGET-c.total,0);
+const spread=Math.max(...cars.map(c=>c.total))-Math.min(...cars.map(c=>c.total));
+return under.length*1e9+def*1e4+spread;
+}
+
+function makeOrderPlan(items,dollLimit){
+const usable=items.filter(i=>!isTmall(i));
+if(!usable.length)return[];
+const byKey={};usable.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
+const total=usable.reduce((s,i)=>s+yen(i.originalPrice),0);
+const minCars=Math.max(1,...Object.values(byKey).map(a=>Math.ceil(a.length/itemCartLimit(a[0],dollLimit))));
+let carCount=Math.max(minCars,Math.floor(total/ORDER_TARGET)||1),best=null;
+
+for(let n=carCount;n>=minCars;n--){
+if(total<n*ORDER_TARGET)continue;
+let local=null;
+for(let t=0;t<250;t++){
+const cars=buildPlanAttempt(usable,dollLimit,n,t>0);
+if(cars.some(c=>!c.items.length))continue;
+if(!local||planScore(cars)<planScore(local))local=cars;
+if(cars.every(c=>c.total>=ORDER_TARGET)){best=cars;break}
+}
+if(best)break;
+if(local&&!best)best=local;
+}
+
+if(!best){
+best=buildPlanAttempt(usable,dollLimit,minCars,false);
+for(let t=0;t<250;t++){
+const x=buildPlanAttempt(usable,dollLimit,minCars,true);
+if(planScore(x)<planScore(best))best=x;
+}
+}
+return best.filter(c=>c.items.length);
 }
 
 function addPlannedCart(items,btn){
 cart.push(...items);saveCart();updateCartUI();
-btn.textContent="✓";
-setTimeout(()=>btn.textContent="＋",1000);
+btn.textContent="✓";setTimeout(()=>btn.textContent="＋",1000);
 }
 
 function renderOrderPlan(target,items,dollLimit,card){
 target.innerHTML="";
 const cars=makeOrderPlan(items,dollLimit);
+let dragging=null;
+
+function recalcCar(c){
+c.total=c.items.reduce((s,i)=>s+yen(i.originalPrice),0);
+c.counts={};
+c.items.forEach(i=>{const k=itemOrderKey(i);c.counts[k]=(c.counts[k]||0)+1});
+}
+
+function updateRow(n){
+const row=target.querySelector(`.auto-order-row[data-car="${n}"]`);if(!row)return;
+const c=cars[n],ok=c.total>=ORDER_TARGET;
+row.querySelector(".auto-order-count").textContent=`${c.items.length}件`;
+row.querySelector(".auto-order-total").textContent=`¥${fmt(c.total)}`;
+const st=row.querySelector(".auto-order-status");
+st.className=`auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}`;
+st.textContent=ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`;
+}
+
+function makeDraggable(el,item,carIndex){
+el.draggable=true;
+el.__orderItem=item;
+el.__carIndex=carIndex;
+el.addEventListener("dragstart",e=>{
+dragging={el,item,from:el.__carIndex};
+el.classList.add("dragging");
+e.dataTransfer.effectAllowed="move";
+try{e.dataTransfer.setData("text/plain",itemOrderKey(item))}catch{}
+});
+el.addEventListener("dragend",()=>{
+el.classList.remove("dragging");
+target.querySelectorAll(".auto-order-grid.drag-over").forEach(g=>g.classList.remove("drag-over"));
+dragging=null;
+});
+}
 
 cars.forEach((c,n)=>{
 const row=document.createElement("div");
 row.className="auto-order-row";
+row.dataset.car=n;
 const ok=c.total>=ORDER_TARGET;
-
-row.innerHTML=
-`<div class="auto-order-no">${n+1}</div>
-<div class="auto-order-main">
-<div class="auto-order-meta">
-<span>${c.items.length}件</span>
-<span>¥${fmt(c.total)}</span>
-<span class="${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`}</span>
-</div>
-<div class="auto-order-grid"></div>
-</div>
-<button class="auto-order-add">＋</button>`;
-
+row.innerHTML=`<div class="auto-order-no">${n+1}</div><div class="auto-order-main"><div class="auto-order-meta"><span class="auto-order-count">${c.items.length}件</span><span class="auto-order-total">¥${fmt(c.total)}</span><span class="auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`}</span></div><div class="auto-order-grid" data-car="${n}"></div></div><button class="auto-order-add">＋</button>`;
 const grid=row.querySelector(".auto-order-grid");
-c.items.forEach(i=>grid.appendChild(card(i)));
+
+c.items.forEach(i=>{
+const el=card(i);makeDraggable(el,i,n);grid.appendChild(el);
+});
+
+grid.addEventListener("dragover",e=>{e.preventDefault();if(dragging&&dragging.from!==n){grid.classList.add("drag-over");e.dataTransfer.dropEffect="move"}});
+grid.addEventListener("dragleave",e=>{if(!grid.contains(e.relatedTarget))grid.classList.remove("drag-over")});
+grid.addEventListener("drop",e=>{
+e.preventDefault();grid.classList.remove("drag-over");
+if(!dragging||dragging.from===n)return;
+const from=dragging.from,to=n,item=dragging.item,key=itemOrderKey(item),limit=itemCartLimit(item,dollLimit);
+const current=cars[to].items.filter(x=>itemOrderKey(x)===key).length;
+if(current>=limit)return alert(`這個商品這一車最多只能放 ${limit} 個`);
+const idx=cars[from].items.indexOf(item);if(idx<0)return;
+cars[from].items.splice(idx,1);cars[to].items.push(item);
+recalcCar(cars[from]);recalcCar(cars[to]);
+dragging.el.__carIndex=to;grid.appendChild(dragging.el);
+updateRow(from);updateRow(to);
+});
+
 row.querySelector(".auto-order-add").onclick=e=>addPlannedCart(c.items,e.currentTarget);
 target.appendChild(row);
 });
-
 if(!cars.length)target.innerHTML="<div style='font-size:11px;color:#999'>沒有可排單商品</div>";
 }
 
 function renderItems(){
-const box=document.getElementById("items-wrapper");
-box.innerHTML="";
-
+const box=document.getElementById("items-wrapper");box.innerHTML="";
 let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;
 if(selectedRole)items=items.filter(i=>i.category===selectedRole);
+if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
 
-if(!items.length){
-box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";
-return;
-}
-
-const remain={...orderedCounts};
-const showOrdered=["pending","latest","reminder"].includes(currentTab);
-
+const remain={...orderedCounts},showOrdered=["pending","latest","reminder"].includes(currentTab);
 const card=i=>{
-const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
-let status="";
-
-if(showOrdered&&(remain[key]||0)>0){
-status="ordered";
-remain[key]--;
-}else if((soldOutCounts[key]||0)>0){
-status="soldout";
-}
-
+const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;let status="";
+if(showOrdered&&(remain[key]||0)>0){status="ordered";remain[key]--}else if((soldOutCounts[key]||0)>0)status="soldout";
 return createCard(i,status);
 };
-
-const grid=a=>{
-const g=document.createElement("div");
-g.className="group-grid";
-a.forEach(i=>g.appendChild(card(i)));
-box.appendChild(g);
-};
+const grid=a=>{const g=document.createElement("div");g.className="group-grid";a.forEach(i=>g.appendChild(card(i)));box.appendChild(g)};
 
 if(!selectedTypes.length&&!selectedRole){
-
 allCategories.forEach(c=>{
-const a=items.filter(i=>i.category===c);
-if(!a.length)return;
-
-const d=document.createElement("div");
-d.className="type-divider";
-
-const title=document.createElement("span");
-title.textContent=c;
-d.appendChild(title);
+const a=items.filter(i=>i.category===c);if(!a.length)return;
+const d=document.createElement("div");d.className="type-divider";
+const title=document.createElement("span");title.textContent=c;d.appendChild(title);
 
 if(["pending","latest","reminder"].includes(currentTab)){
-const btn=document.createElement("button");
-btn.className="category-add-all";
-btn.textContent="➕";
-btn.onclick=e=>addCategoryToCart(e,c);
-d.appendChild(btn);
+const btn=document.createElement("button");btn.className="category-add-all";btn.textContent="➕";btn.onclick=e=>addCategoryToCart(e,c);d.appendChild(btn);
 
 if(planGroup(a)){
-const autoItems=a.filter(isAutoOrderItem);
-const otherItems=a.filter(i=>!isAutoOrderItem(i));
-
 const input=document.createElement("input");
-input.className="order-limit-input";
-input.type="number";
-input.min="1";
-input.max="2";
-input.inputMode="numeric";
-input.title="吊娃／娃每車限購數量";
-input.value=String(orderLimits[c]||1);
-d.appendChild(input);
+input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="娃限購";input.title="吊娃／娃每車限購數量";input.value=orderLimits[c]||"";d.appendChild(input);
+box.appendChild(d);
 
-const plan=document.createElement("div");
-plan.className="auto-order-wrap";
-
-const repaint=()=>{
-let v=String(input.value||"1").replace(/[^12]/g,"");
-if(!v)v="1";
-if(v.length>1)v=v.slice(-1);
-input.value=v;
-orderLimits[c]=v;
-saveOrderLimits();
-renderOrderPlan(plan,autoItems,v,card);
+input.oninput=()=>{
+let v=String(input.value||"").replace(/[^12]/g,"");if(v.length>1)v=v.slice(-1);
+orderLimits[c]=v;renderItems();
 };
 
-input.oninput=repaint;
+if(!input.value){grid(a);return}
 
-box.appendChild(d);
-box.appendChild(plan);
-repaint();
-if(otherItems.length)grid(otherItems);
+const plan=document.createElement("div");plan.className="auto-order-wrap";box.appendChild(plan);
+const planItems=a.filter(i=>!isTmall(i)),tmallItems=a.filter(isTmall);
+renderOrderPlan(plan,planItems,input.value,card);
+if(tmallItems.length)grid(tmallItems);
 return;
 }
 }
-
-box.appendChild(d);
-grid(a);
+box.appendChild(d);grid(a);
 });
-
 }else grid(items);
 }
 
@@ -805,7 +799,7 @@ ordered:[
 ...result.filter(x=>x.kind==="woocommerce").map(x=>x.item)
 ],
 soldOut:result.filter(x=>x.kind==="shopify"&&!x.available).map(x=>x.item),
-unresolved:result.filter(x=>x.kind==="page").map(x=>x.item)
+unresolved:[...result.filter(x=>x.kind==="page").map(x=>x.item),...result.filter(x=>x.kind==="missing").map(x=>x.item)]
 };
 }
 
@@ -836,9 +830,7 @@ btn.textContent="正在辨識購物車...";
 const spare=[];
 
 try{
-if(cart.some(i=>!i.url))throw new Error("有商品沒有商品網址");
-
-const uniqueUrls=[...new Set(cart.map(i=>i.url))];
+const uniqueUrls=[...new Set(cart.map(i=>i.url).filter(Boolean))];
 
 for(let i=1;i<uniqueUrls.length;i++){
 const w=window.open("about:blank","_blank");
@@ -870,7 +862,7 @@ closeModal();
 
 if(!data.destinations.length){
 renderItems();
-alert(data.soldOut.length?"購物車內商品目前都已缺貨，已記錄缺貨":"沒有可處理的商品");
+if(data.soldOut.length)alert("購物車內商品目前都已缺貨，已記錄缺貨");
 btn.disabled=false;
 btn.textContent="確認訂購";
 return;

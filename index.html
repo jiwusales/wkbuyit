@@ -43,6 +43,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .soldout-tag{position:absolute;top:3px;left:4px;font-size:15px;line-height:1;z-index:10}
 .card img{height:90px;width:auto;max-width:90%;display:block;margin:5px auto 0;object-fit:contain;pointer-events:none}
 .card .buyer{margin:2px 2px 0;font-size:9px;font-weight:bold;line-height:1.2;color:#989FC0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deposit-paid{margin:2px 2px 0;font-size:9px;font-weight:bold;line-height:1.2;color:#E24C60}
 .card .name{margin:1px 2px;font-size:9px;font-weight:bold;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .price{font-size:10px;margin:1px auto 5px;color:#F68450}
 .product-link{display:inline-block;margin:0 auto 5px;padding:3px 8px;border:1px solid var(--theme);border-radius:6px;color:var(--active);font-size:9px;text-decoration:none;background:#fff}
@@ -153,8 +154,8 @@ async function getSheet(sheet){
 if(sheetCache[sheet])return sheetCache[sheet];
 const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&headers=1`;
 const t=await fetch(url).then(r=>r.text()),data=JSON.parse(t.substr(47).slice(0,-2)),L=(data.table.cols||[]).map(c=>String(c.label||"").trim());
-const C={ip:col(L,"IP"),role:col(L,"角色"),type:col(L,"種類"),name:col(L,"名稱"),originalPrice:col(L,"原價"),stock:col(L,"庫存"),sn:col(L,"貨號"),img:col(L,"圖片","首圖"),url:col(L,"商品網址","網址"),status:col(L,"狀態"),group:col(L,"團名"),source:col(L,"來源"),customer:col(L,"顧客名稱","購買人","訂購人")};
-return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),originalPrice:getV(r,C.originalPrice),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img),url:getV(r,C.url),status:getV(r,C.status),group:getV(r,C.group),source:getV(r,C.source),customer:getV(r,C.customer)}));
+const C={ip:col(L,"IP"),role:col(L,"角色"),type:col(L,"種類"),name:col(L,"名稱"),originalPrice:col(L,"原價"),stock:col(L,"庫存"),sn:col(L,"貨號"),img:col(L,"圖片","首圖"),url:col(L,"商品網址","網址"),status:col(L,"狀態"),group:col(L,"團名"),source:col(L,"來源"),customer:col(L,"顧客名稱","購買人","訂購人"),last5:col(L,"後五碼")};
+return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),originalPrice:getV(r,C.originalPrice),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img),url:getV(r,C.url),status:getV(r,C.status),group:getV(r,C.group),source:getV(r,C.source),customer:getV(r,C.customer),last5:getV(r,C.last5)}));
 }
 
 async function loadOrderedCounts(){
@@ -562,6 +563,7 @@ ${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
 ${warn?'<div class="stock-warning">☝🏻</div>':""}
 ${(!rem||item.url)?'<div class="add-btn-tag">＋</div>':""}
 <img src="${item.img||IMG}">
+${String(item.last5||"").trim()?'<div class="deposit-paid">已付訂金</div>':""}
 ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
 <div class="name" title="${productText(item)}">${productText(item)}</div>
 <div class="price">${priceText(item.originalPrice)}</div>

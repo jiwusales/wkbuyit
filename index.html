@@ -345,8 +345,11 @@ function isTmall(i){return /天貓/.test(String(i.name||""))}
 function planGroup(items){return ["pending","latest","reminder"].includes(currentTab)&&items.some(i=>isAutoOrderItem(i)&&!isTmall(i))}
 function itemOrderKey(i){return norm(i.sn)||norm(`${i.name}|${i.role}`)}
 function isLimitedDoll(i){
-const t=norm(i.type),n=norm(i.name);
-return /^(吊娃|娃|娃娃|娃類|玩偶|布偶|マスコット|ぬい|ぬいぐるみ)$/.test(t)||/(吊娃|娃娃|マスコット|ぬいぐるみ)/i.test(n);
+const n=norm(i.name);
+/* 名稱只要有明確「其他品項」文字，就不算娃；沒有標明品項時一律視為吊娃／娃 */
+const other=/(貼紙|貼紙組|ステッカー|シール|鑰匙圈|鑰匙扣|キーホルダー|キーリング|吊飾|チャーム|ストラップ|徽章|胸章|缶バッジ|立牌|壓克力|アクリル|卡片|卡套|カード|明信片|ポストカード|資料夾|ファイル|便條|メモ|紙膠帶|マスキングテープ|筆|文具|印章|スタンプ|磁鐵|マグネット|夾子|クリップ|手機殼|手機|ケース|リング|包包|提袋|袋子|托特包|バッグ|トート|ポーチ|收納包|束口袋|巾着|錢包|財布|衣服|服飾|T恤|Ｔ恤|上衣|外套|帽子|襪子|Tシャツ|シャツ|パーカー|キャップ|ソックス|毛巾|手帕|タオル|ハンカチ|杯子|馬克杯|水杯|玻璃杯|マグ|タンブラー|コップ|盤子|餐盤|托盤|碗|筷子|湯匙|叉子|皿|プレート|トレー|ボウル|スプーン|フォーク|便當盒|餐具|收納盒|盒子|ケース|鏡子|鏡|ミラー|梳子|ブラシ|毯子|毛毯|抱枕|坐墊|クッション|ブランケット|公仔|模型|フィギュア|娃衣|ぬい服|ぬいぐるみ用|収納)/i;
+if(other.test(n))return false;
+return true;
 }
 function itemCartLimit(i,dollLimit){return isLimitedDoll(i)?Math.max(1,Math.min(2,Number(dollLimit)||1)):Infinity}
 
@@ -519,7 +522,7 @@ const btn=document.createElement("button");btn.className="category-add-all";btn.
 
 if(planGroup(a)){
 const input=document.createElement("input");
-input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder=" ";input.title="只限制吊娃／娃，每車可放 1 或 2 個";input.value=orderLimits[c]||"";d.appendChild(input);
+input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="數量";input.title="只限制吊娃／娃，每車可放 1 或 2 個";input.value=orderLimits[c]||"";d.appendChild(input);
 
 const confirmBtn=document.createElement("button");
 confirmBtn.className="order-limit-confirm";confirmBtn.textContent="確認";d.appendChild(confirmBtn);

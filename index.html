@@ -21,13 +21,16 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 #card-container{padding:158px 10px 10px}.type-divider{display:flex;align-items:center;justify-content:center;margin:15px 0 8px;font-weight:bold;font-size:16px}
 .type-divider::before,.type-divider::after{content:"";flex:1;border-top:1px solid #ddd;margin:0 10px}
 .category-add-all{background:#fff;border:1px solid var(--theme);color:var(--active);border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer;margin-left:6px}
-.order-limit-input{width:72px;height:24px;margin-left:6px;border:1px solid var(--theme);border-radius:6px;padding:2px 6px;font-size:10px;text-align:center;color:#555;background:#fff}
-.auto-order-wrap{margin:0 0 10px}
-.auto-order-car{max-width:900px;margin:6px auto;padding:8px 10px;background:#fff;border:1px solid var(--theme);border-radius:8px;text-align:left;font-size:11px}
-.auto-order-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:bold}
-.auto-order-add{margin-left:auto;background:var(--theme);color:#fff;border:0;border-radius:6px;padding:5px 9px;font-size:10px;cursor:pointer}
-.auto-order-items{margin-top:5px;color:#777;line-height:1.5}
-.auto-order-ok{color:#55a36a}.auto-order-warn{color:#e78655}
+.order-limit-input{width:42px;height:24px;margin-left:6px;border:1px solid var(--theme);border-radius:6px;padding:2px 4px;font-size:10px;text-align:center;color:#555;background:#fff}
+.auto-order-wrap{margin:0 0 12px}
+.auto-order-row{display:flex;align-items:flex-start;gap:6px;margin:7px 0}
+.auto-order-no{width:24px;min-width:24px;padding-top:52px;font-size:18px;font-weight:bold;color:#666;line-height:1;text-align:center}
+.auto-order-main{flex:1;min-width:0}
+.auto-order-meta{display:flex;align-items:center;gap:8px;margin:0 0 4px 2px;font-size:10px;color:#777}
+.auto-order-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+@media(min-width:480px){.auto-order-grid{grid-template-columns:repeat(auto-fill,120px)}}
+.auto-order-add{width:30px;min-width:30px;height:30px;border:0;border-radius:8px;background:var(--theme);color:#fff;font-size:17px;font-weight:bold;cursor:pointer;margin-top:50px}
+.auto-order-ok{color:#55a36a;font-weight:bold}.auto-order-warn{color:#e78655;font-weight:bold}
 
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
@@ -93,19 +96,19 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 <script>
 const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",IMG="https://i.postimg.cc/bv5xRs04/image.png";
 const ORDER_API="https://script.google.com/macros/s/AKfycbz2MEC8O7cjxRLb3xQMGnOLlzfoPc8E_-PDnXjb8sCFph1oLvBAnY30y6OyzcA8iSVt/exec";
-const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop"},ALLOWED=Object.values(SITES);
+const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop",pocket:"https://chiikawa-pocket-goods-store.com"},ALLOWED=Object.values(SITES);
 const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
 const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
 
 let savedTab=localStorage.getItem("jiwu_helper_tab");
-let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={},orderLimits={};
+let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={},orderLimits=JSON.parse(localStorage.getItem("jiwu_helper_order_limits")||"{}");
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
 function getV(r,i){if(i<0||!r.c||!r.c[i])return"";const c=r.c[i];return String(c.v??c.f??"").trim()}
 function originOf(u){try{return new URL(u).origin}catch{return""}}
-function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"ナガノ":o===SITES.mogu?"もぐもぐ本舖":hostKey(o)||"未知官網"}
+function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"ナガノ":o===SITES.mogu?"もぐもぐ本舖":o===SITES.pocket?"ちいかわポケット":hostKey(o)||"未知官網"}
 function yen(v){const n=Number(String(v||"").replace(/[^\d.-]/g,""));return Number.isFinite(n)?n:0}
 function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
@@ -329,69 +332,114 @@ renderFilters();renderItems();
 
 const ORDER_TARGET=11000;
 
-function itemOrderKey(i){
-return norm(i.sn)||norm(`${i.name}|${i.role}`);
-}
+function saveOrderLimits(){localStorage.setItem("jiwu_helper_order_limits",JSON.stringify(orderLimits))}
+function isAutoOrderItem(i){return ALLOWED.includes(originOf(i.url))}
+function planGroup(items){return ["pending","latest","reminder"].includes(currentTab)&&items.some(isAutoOrderItem)}
+function itemOrderKey(i){return norm(i.sn)||norm(`${i.name}|${i.role}`)}
+function isLimitedDoll(i){return /(吊娃|娃娃|娃|マスコット|ぬいぐるみ|ぬい)/i.test(`${i.type||""} ${i.name||""}`)}
+function itemCartLimit(i,dollLimit){return isLimitedDoll(i)?Math.max(1,Math.min(2,Number(dollLimit)||1)):1}
 
-function isLimitedDoll(i){
-return /(吊娃|娃娃|娃|マスコット|ぬいぐるみ|ぬい)/i.test(`${i.type||""} ${i.name||""}`);
-}
-
-function makeOrderPlan(items,limit){
-limit=Math.max(1,Math.min(2,Number(limit)||1));
-const usable=items.filter(i=>i.url),limited=usable.filter(isLimitedDoll),regular=usable.filter(i=>!isLimitedDoll(i));
+function makeOrderPlan(items,dollLimit){
+const usable=items.filter(i=>i.url);
 if(!usable.length)return[];
 
-const groups={};
-limited.forEach(i=>(groups[itemOrderKey(i)]??=[]).push(i));
+const byKey={};
+usable.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
 
 const total=usable.reduce((s,i)=>s+yen(i.originalPrice),0);
-const limitCars=Math.max(1,...Object.values(groups).map(a=>Math.ceil(a.length/limit)));
-const amountCars=Math.max(1,Math.floor(total/ORDER_TARGET));
-const cars=Array.from({length:Math.max(limitCars,amountCars)},()=>({items:[],total:0,counts:{}}));
+const minCars=Math.max(1,...Object.values(byKey).map(a=>Math.ceil(a.length/itemCartLimit(a[0],dollLimit))));
+const maxCars=Math.max(1,Math.floor(total/ORDER_TARGET));
+const carCount=Math.max(minCars,maxCars);
 
-Object.values(groups).sort((a,b)=>b.length-a.length).forEach(a=>{
-a.sort((x,y)=>yen(y.originalPrice)-yen(x.originalPrice)).forEach(i=>{
-const k=itemOrderKey(i);
-const c=cars.filter(x=>(x.counts[k]||0)<limit).sort((a,b)=>a.total-b.total)[0];
-if(!c)return;
-c.items.push(i);c.total+=yen(i.originalPrice);c.counts[k]=(c.counts[k]||0)+1;
+const cars=Array.from({length:carCount},()=>({items:[],total:0,counts:{}}));
+
+const groups=Object.values(byKey).sort((a,b)=>{
+const qa=Math.ceil(a.length/itemCartLimit(a[0],dollLimit));
+const qb=Math.ceil(b.length/itemCartLimit(b[0],dollLimit));
+return qb-qa||Math.max(...b.map(x=>yen(x.originalPrice)))-Math.max(...a.map(x=>yen(x.originalPrice)));
+});
+
+groups.forEach(group=>{
+group.sort((a,b)=>yen(b.originalPrice)-yen(a.originalPrice));
+group.forEach(i=>{
+const k=itemOrderKey(i),limit=itemCartLimit(i,dollLimit);
+let choices=cars.filter(c=>(c.counts[k]||0)<limit);
+if(!choices.length)return;
+choices.sort((a,b)=>{
+const ad=a.total<ORDER_TARGET?0:1,bd=b.total<ORDER_TARGET?0:1;
+return ad-bd||a.total-b.total;
+});
+const c=choices[0];
+c.items.push(i);
+c.total+=yen(i.originalPrice);
+c.counts[k]=(c.counts[k]||0)+1;
 });
 });
 
-regular.sort((a,b)=>yen(b.originalPrice)-yen(a.originalPrice)).forEach(i=>{
-const c=[...cars].sort((a,b)=>a.total-b.total)[0];
-c.items.push(i);c.total+=yen(i.originalPrice);
-});
+for(let pass=0;pass<200;pass++){
+const low=cars.filter(c=>c.total<ORDER_TARGET).sort((a,b)=>a.total-b.total)[0];
+if(!low)break;
+
+let moved=false;
+const donors=cars.filter(c=>c!==low&&c.total>ORDER_TARGET).sort((a,b)=>b.total-a.total);
+
+for(const donor of donors){
+const options=donor.items
+.map((i,idx)=>({i,idx,p:yen(i.originalPrice),k:itemOrderKey(i),limit:itemCartLimit(i,dollLimit)}))
+.filter(x=>(low.counts[x.k]||0)<x.limit&&donor.total-x.p>=ORDER_TARGET)
+.sort((a,b)=>Math.abs((low.total+a.p)-ORDER_TARGET)-Math.abs((low.total+b.p)-ORDER_TARGET));
+
+if(!options.length)continue;
+const x=options[0];
+donor.items.splice(x.idx,1);
+donor.total-=x.p;
+donor.counts[x.k]--;
+low.items.push(x.i);
+low.total+=x.p;
+low.counts[x.k]=(low.counts[x.k]||0)+1;
+moved=true;
+break;
+}
+if(!moved)break;
+}
 
 return cars.filter(c=>c.items.length);
 }
 
 function addPlannedCart(items,btn){
 cart.push(...items);saveCart();updateCartUI();
-btn.textContent=`✓ 已加入 ${items.length}件`;
-setTimeout(()=>btn.textContent="＋ 加入這車",1000);
+btn.textContent="✓";
+setTimeout(()=>btn.textContent="＋",1000);
 }
 
-function renderOrderPlan(box,items,limit){
-box.innerHTML="";
-if(!limit)return;
-
-const cars=makeOrderPlan(items,limit);
-if(!cars.length){
-box.innerHTML="<div style='font-size:11px;color:#999'>沒有可排單商品</div>";
-return;
-}
+function renderOrderPlan(target,items,dollLimit,card){
+target.innerHTML="";
+const cars=makeOrderPlan(items,dollLimit);
 
 cars.forEach((c,n)=>{
-const d=document.createElement("div");
-d.className="auto-order-car";
+const row=document.createElement("div");
+row.className="auto-order-row";
 const ok=c.total>=ORDER_TARGET;
-const names=c.items.map(i=>`${buyerText(i)?buyerText(i)+" ":""}${productText(i)}`).join("、");
-d.innerHTML=`<div class="auto-order-head"><span>第 ${n+1} 車</span><span>${c.items.length}件</span><span>¥${fmt(c.total)}</span><span class="${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`}</span><button class="auto-order-add">＋ 加入這車</button></div><div class="auto-order-items">${names}</div>`;
-d.querySelector(".auto-order-add").onclick=e=>addPlannedCart(c.items,e.currentTarget);
-box.appendChild(d);
+
+row.innerHTML=
+`<div class="auto-order-no">${n+1}</div>
+<div class="auto-order-main">
+<div class="auto-order-meta">
+<span>${c.items.length}件</span>
+<span>¥${fmt(c.total)}</span>
+<span class="${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`}</span>
+</div>
+<div class="auto-order-grid"></div>
+</div>
+<button class="auto-order-add">＋</button>`;
+
+const grid=row.querySelector(".auto-order-grid");
+c.items.forEach(i=>grid.appendChild(card(i)));
+row.querySelector(".auto-order-add").onclick=e=>addPlannedCart(c.items,e.currentTarget);
+target.appendChild(row);
 });
+
+if(!cars.length)target.innerHTML="<div style='font-size:11px;color:#999'>沒有可排單商品</div>";
 }
 
 function renderItems(){
@@ -450,32 +498,39 @@ btn.textContent="➕";
 btn.onclick=e=>addCategoryToCart(e,c);
 d.appendChild(btn);
 
-if(currentTab==="latest"&&c.includes("吉伊新品")){
+if(planGroup(a)){
+const autoItems=a.filter(isAutoOrderItem);
+const otherItems=a.filter(i=>!isAutoOrderItem(i));
+
 const input=document.createElement("input");
 input.className="order-limit-input";
 input.type="number";
 input.min="1";
 input.max="2";
 input.inputMode="numeric";
-input.placeholder="娃限購 1/2";
-input.value=orderLimits[c]||"";
+input.title="吊娃／娃每車限購數量";
+input.value=String(orderLimits[c]||1);
 d.appendChild(input);
 
 const plan=document.createElement("div");
 plan.className="auto-order-wrap";
 
-input.oninput=()=>{
-let v=String(input.value||"").replace(/[^12]/g,"");
+const repaint=()=>{
+let v=String(input.value||"1").replace(/[^12]/g,"");
+if(!v)v="1";
 if(v.length>1)v=v.slice(-1);
 input.value=v;
 orderLimits[c]=v;
-renderOrderPlan(plan,a,v);
+saveOrderLimits();
+renderOrderPlan(plan,autoItems,v,card);
 };
+
+input.oninput=repaint;
 
 box.appendChild(d);
 box.appendChild(plan);
-if(input.value)renderOrderPlan(plan,a,input.value);
-grid(a);
+repaint();
+if(otherItems.length)grid(otherItems);
 return;
 }
 }

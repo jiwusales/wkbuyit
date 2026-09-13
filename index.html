@@ -502,13 +502,21 @@ let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)
 if(selectedRole)items=items.filter(i=>i.category===selectedRole);
 if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
 
-const remain={...orderedCounts},showOrdered=["pending","latest","reminder"].includes(currentTab);
-const card=i=>{
-const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;let status="";
-if(showOrdered&&(remain[key]||0)>0){status="ordered";remain[key]--}else if((soldOutCounts[key]||0)>0)status="soldout";
-return createCard(i,status);
-};
-const grid=a=>{const g=document.createElement("div");g.className="group-grid";a.forEach(i=>g.appendChild(card(i)));box.appendChild(g)};
+/* 先固定每張卡的已購買／缺貨狀態，排單只使用完全沒有標記的卡 */
+const remainOrdered={...orderedCounts},remainSoldOut={...soldOutCounts};
+const showOrdered=["pending","latest","reminder"].includes(currentTab);
+const statusMap=new WeakMap();
+items.forEach(i=>{
+const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+let status="";
+if(showOrdered&&(remainOrdered[key]||0)>0){status="ordered";remainOrdered[key]--}
+else if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
+statusMap.set(i,status);
+i._orderStatus=status;
+});
+
+const card=i=>createCard(i,statusMap.get(i)||"");
+const grid=a=>{if(!a.length)return;const g=document.createElement("div");g.className="group-grid";a.forEach(i=>g.appendChild(card(i)));box.appendChild(g)};
 
 if(!selectedTypes.length&&!selectedRole){
 allCategories.forEach(c=>{
@@ -527,10 +535,7 @@ const confirmBtn=document.createElement("button");
 confirmBtn.className="order-limit-confirm";confirmBtn.textContent="確認";d.appendChild(confirmBtn);
 box.appendChild(d);
 
-input.oninput=()=>{
-let v=String(input.value||"").replace(/[^12]/g,"");if(v.length>1)v=v.slice(-1);input.value=v;
-};
-
+input.oninput=()=>{let v=String(input.value||"").replace(/[^12]/g,"");if(v.length>1)v=v.slice(-1);input.value=v};
 confirmBtn.onclick=()=>{
 const v=String(input.value||"").trim();
 if(!v){delete orderLimits[c];renderItems();return}
@@ -538,12 +543,16 @@ if(!["1","2"].includes(v))return alert("娃類限購數量請輸入 1 或 2");
 orderLimits[c]=v;renderItems();
 };
 
+/* 尚未確認數量時維持全部商品原排列 */
 if(!orderLimits[c]){grid(a);return}
 
 const plan=document.createElement("div");plan.className="auto-order-wrap";box.appendChild(plan);
-const planItems=a.filter(i=>!isTmall(i)),tmallItems=a.filter(isTmall);
+
+/* 已購買 ✓、缺貨 ❌、天貓都不進排單；只有完全無標記的卡才排單 */
+const planItems=a.filter(i=>!isTmall(i)&&!(statusMap.get(i)||""));
+const excludedItems=a.filter(i=>isTmall(i)||(statusMap.get(i)||""));
 renderOrderPlan(plan,planItems,orderLimits[c],card);
-if(tmallItems.length)grid(tmallItems);
+if(excludedItems.length)grid(excludedItems);
 return;
 }
 }
@@ -563,7 +572,7 @@ c.innerHTML=
 `${status==="ordered"?'<div class="ordered-tag">✓</div>':""}
 ${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
 ${warn?'<div class="stock-warning">☝🏻</div>':""}
-${(!rem||item.url)?'<div class="add-btn-tag">＋</div>':""}
+${(!status&&(!rem||item.url))?'<div class="add-btn-tag">＋</div>':""}
 <img src="${item.img||IMG}">
 ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
 <div class="name" title="${productText(item)}">${productText(item)}</div>
@@ -595,7 +604,7 @@ setTimeout(()=>e.currentTarget.style.opacity=1,120);
 
 function addCategoryToCart(e,category){
 e.stopPropagation();
-let items=allItems.filter(i=>i.category===category);
+let items=allItems.filter(i=>i.category===category&&!i._orderStatus);
 if(currentTab==="reminder")items=items.filter(i=>i.url).map(i=>({...i,urlOnly:true}));
 if(!items.length)return alert("這個分類沒有可加入的商品");
 cart.push(...items);saveCart();updateCartUI();

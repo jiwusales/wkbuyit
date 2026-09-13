@@ -22,6 +22,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .type-divider::before,.type-divider::after{content:"";flex:1;border-top:1px solid #ddd;margin:0 10px}
 .category-add-all{background:#fff;border:1px solid var(--theme);color:var(--active);border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer;margin-left:6px}
 .order-limit-input{width:42px;height:24px;margin-left:6px;border:1px solid var(--theme);border-radius:6px;padding:2px 4px;font-size:10px;text-align:center;color:#555;background:#fff}
+.order-limit-confirm{height:24px;margin-left:4px;border:0;border-radius:6px;padding:0 8px;background:var(--theme);color:#fff;font-size:10px;font-weight:bold;cursor:pointer}
 .auto-order-wrap{margin:0 0 12px}
 .auto-order-row{display:flex;align-items:flex-start;gap:6px;margin:7px 0}
 .auto-order-no{width:24px;min-width:24px;padding-top:52px;font-size:18px;font-weight:bold;color:#666;line-height:1;text-align:center}
@@ -342,8 +343,11 @@ function isAutoOrderItem(i){return ALLOWED.includes(originOf(i.url))}
 function isTmall(i){return /天貓/.test(String(i.name||""))}
 function planGroup(items){return ["pending","latest","reminder"].includes(currentTab)&&items.some(i=>isAutoOrderItem(i)&&!isTmall(i))}
 function itemOrderKey(i){return norm(i.sn)||norm(`${i.name}|${i.role}`)}
-function isLimitedDoll(i){return /(吊娃|娃娃|娃|マスコット|ぬいぐるみ|ぬい)/i.test(`${i.type||""} ${i.name||""}`)}
-function itemCartLimit(i,dollLimit){return isLimitedDoll(i)?Math.max(1,Math.min(2,Number(dollLimit)||1)):1}
+function isLimitedDoll(i){
+const t=norm(i.type),n=norm(i.name);
+return /^(吊娃|娃|娃娃|娃類|玩偶|布偶|マスコット|ぬい|ぬいぐるみ)$/.test(t)||/(吊娃|娃娃|マスコット|ぬいぐるみ)/i.test(n);
+}
+function itemCartLimit(i,dollLimit){return isLimitedDoll(i)?Math.max(1,Math.min(2,Number(dollLimit)||1)):Infinity}
 
 function buildPlanAttempt(items,dollLimit,carCount,randomize=false){
 const cars=Array.from({length:carCount},()=>({items:[],total:0,counts:{}}));
@@ -475,7 +479,7 @@ e.preventDefault();grid.classList.remove("drag-over");
 if(!dragging||dragging.from===n)return;
 const from=dragging.from,to=n,item=dragging.item,key=itemOrderKey(item),limit=itemCartLimit(item,dollLimit);
 const current=cars[to].items.filter(x=>itemOrderKey(x)===key).length;
-if(current>=limit)return alert(`這個商品這一車最多只能放 ${limit} 個`);
+if(Number.isFinite(limit)&&current>=limit)return alert(`娃類商品這一車最多只能放 ${limit} 個`);
 const idx=cars[from].items.indexOf(item);if(idx<0)return;
 cars[from].items.splice(idx,1);cars[to].items.push(item);
 recalcCar(cars[from]);recalcCar(cars[to]);
@@ -514,19 +518,28 @@ const btn=document.createElement("button");btn.className="category-add-all";btn.
 
 if(planGroup(a)){
 const input=document.createElement("input");
-input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="數量";input.title="吊娃／娃每車限購數量";input.value=orderLimits[c]||"";d.appendChild(input);
+input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="娃限購";input.title="只限制吊娃／娃，每車可放 1 或 2 個";input.value=orderLimits[c]||"";d.appendChild(input);
+
+const confirmBtn=document.createElement("button");
+confirmBtn.className="order-limit-confirm";confirmBtn.textContent="確認";d.appendChild(confirmBtn);
 box.appendChild(d);
 
 input.oninput=()=>{
-let v=String(input.value||"").replace(/[^12]/g,"");if(v.length>1)v=v.slice(-1);
+let v=String(input.value||"").replace(/[^12]/g,"");if(v.length>1)v=v.slice(-1);input.value=v;
+};
+
+confirmBtn.onclick=()=>{
+const v=String(input.value||"").trim();
+if(!v){delete orderLimits[c];renderItems();return}
+if(!["1","2"].includes(v))return alert("娃類限購數量請輸入 1 或 2");
 orderLimits[c]=v;renderItems();
 };
 
-if(!input.value){grid(a);return}
+if(!orderLimits[c]){grid(a);return}
 
 const plan=document.createElement("div");plan.className="auto-order-wrap";box.appendChild(plan);
 const planItems=a.filter(i=>!isTmall(i)),tmallItems=a.filter(isTmall);
-renderOrderPlan(plan,planItems,input.value,card);
+renderOrderPlan(plan,planItems,orderLimits[c],card);
 if(tmallItems.length)grid(tmallItems);
 return;
 }

@@ -226,6 +226,12 @@ function getAnyV(r,indexes){
 
 function hasSn(i){return String(i?.sn??"").trim()!==""}
 function hasUrl(i){return String(i?.url??"").trim()!==""}
+function isMoguItem(i){
+  return originOf(i?.url)===SITES.mogu||/mogu|もぐもぐ/i.test(String(i?.group||""));
+}
+function itemReady(i){
+  return hasUrl(i)&&(isMoguItem(i)||hasSn(i));
+}
 
 async function getSheet(sheet,force=false){
   if(!force&&sheetCache[sheet])return sheetCache[sheet];
@@ -435,18 +441,17 @@ async function switchTab(key){
         .map(i=>mergeLatestPrice(i,latest));
 
       /*
-        貨號完全不驗證格式：
-        123 / ABC / CHGS-123 / A1 都算有貨號。
-        同團只要任一商品有「貨號＋網址」，整團進開團待訂區。
+        一般網站：貨號＋網址才算完整
+        もぐもぐ本舖：只要有商品網址就算完整，不需要貨號
       */
       const latestGroups=new Set(
-        rows.filter(i=>norm(i.group)&&hasSn(i)&&hasUrl(i)).map(i=>norm(i.group))
+        rows.filter(i=>norm(i.group)&&itemReady(i)).map(i=>norm(i.group))
       );
 
       if(key==="latest"){
-        rows=rows.filter(i=>i.group?latestGroups.has(norm(i.group)):hasSn(i)&&hasUrl(i));
+        rows=rows.filter(i=>i.group?latestGroups.has(norm(i.group)):itemReady(i));
       }else{
-        rows=rows.filter(i=>i.group?!latestGroups.has(norm(i.group)):!hasSn(i)||!hasUrl(i));
+        rows=rows.filter(i=>i.group?!latestGroups.has(norm(i.group)):!itemReady(i));
       }
 
     }else{
@@ -732,8 +737,21 @@ box.appendChild(d);grid(a);
 
 function createCard(item,status=""){
   const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
-  const noSn=!hasSn(item),noUrl=!hasUrl(item);
-  const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${noSn&&noUrl?"缺貨號、商品網址":noSn?"缺貨號":noUrl?"缺商品網址":""}</div>`:"";
+  const noSn=!hasSn(item),noUrl=!hasUrl(item),mogu=isMoguItem(item);
+
+  let miss="";
+  if(rem){
+    let msg="";
+    if(mogu){
+      if(noUrl)msg="缺商品網址";
+    }else{
+      if(noSn&&noUrl)msg="缺貨號、商品網址";
+      else if(noSn)msg="缺貨號";
+      else if(noUrl)msg="缺商品網址";
+    }
+    if(msg)miss=`<div style="font-size:9px;color:#e66;margin-bottom:5px">${msg}</div>`;
+  }
+
   const warn=normalTab()&&item.colStock==="1";
   const link=item.url?`<a class="product-link" href="${item.url}" target="_blank" onclick="event.stopPropagation()">商品頁面</a>`:"";
 

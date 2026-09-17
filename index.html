@@ -671,68 +671,114 @@ if(!cars.length)target.innerHTML="<div style='font-size:11px;color:#999'>沒有�
 }
 
 function renderItems(){
-const box=document.getElementById("items-wrapper");box.innerHTML="";
-let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;
-if(selectedRole)items=items.filter(i=>i.category===selectedRole);
-if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
+  const box=document.getElementById("items-wrapper");
+  box.innerHTML="";
 
-/* 先固定每張卡的已購買／缺貨狀態，排單只使用完全沒有標記的卡 */
-const remainOrdered={...orderedCounts},remainSoldOut={...soldOutCounts};
-const showOrdered=["pending","latest","reminder"].includes(currentTab);
-const statusMap=new WeakMap();
-items.forEach(i=>{
-const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
-let status="";
-if(showOrdered&&(remainOrdered[key]||0)>0){status="ordered";remainOrdered[key]--}
-else if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
-statusMap.set(i,status);
-i._orderStatus=status;
-});
+  let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;
+  if(selectedRole)items=items.filter(i=>i.category===selectedRole);
+  if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
 
-const card=i=>createCard(i,statusMap.get(i)||"");
-const grid=a=>{if(!a.length)return;const g=document.createElement("div");g.className="group-grid";a.forEach(i=>g.appendChild(card(i)));box.appendChild(g)};
+  const remainOrdered={...orderedCounts},remainSoldOut={...soldOutCounts};
+  const showOrdered=["pending","latest","reminder"].includes(currentTab);
+  const statusMap=new WeakMap();
 
-if(!selectedTypes.length&&!selectedRole){
-allCategories.forEach(c=>{
-const a=items.filter(i=>i.category===c);if(!a.length)return;
-const d=document.createElement("div");d.className="type-divider";
-const title=document.createElement("span");title.textContent=c;d.appendChild(title);
+  items.forEach(i=>{
+    const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+    let status="";
+    if(showOrdered&&(remainOrdered[key]||0)>0){status="ordered";remainOrdered[key]--}
+    else if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
+    statusMap.set(i,status);
+    i._orderStatus=status;
+  });
 
-if(["pending","latest","reminder"].includes(currentTab)){
-const btn=document.createElement("button");btn.className="category-add-all";btn.textContent="➕";btn.onclick=e=>addCategoryToCart(e,c);d.appendChild(btn);
+  const card=i=>createCard(i,statusMap.get(i)||"");
+  const grid=a=>{
+    if(!a.length)return;
+    const g=document.createElement("div");
+    g.className="group-grid";
+    a.forEach(i=>g.appendChild(card(i)));
+    box.appendChild(g);
+  };
 
-if(planGroup(a)){
-const input=document.createElement("input");
-input.className="order-limit-input";input.type="number";input.min="1";input.max="2";input.inputMode="numeric";input.placeholder="數量";input.title="只限制吊娃／娃，每車可放 1 或 2 個";input.value=orderLimits[c]||"";d.appendChild(input);
+  if(!selectedTypes.length){
+    const categories=selectedRole?[selectedRole]:allCategories;
 
-const confirmBtn=document.createElement("button");
-confirmBtn.className="order-limit-confirm";confirmBtn.textContent="確認";d.appendChild(confirmBtn);
-box.appendChild(d);
+    categories.forEach(c=>{
+      const a=items.filter(i=>i.category===c);
+      if(!a.length)return;
 
-input.oninput=()=>{let v=String(input.value||"").replace(/[^12]/g,"");if(v.length>1)v=v.slice(-1);input.value=v};
-confirmBtn.onclick=()=>{
-const v=String(input.value||"").trim();
-if(!v){delete orderLimits[c];renderItems();return}
-if(!["1","2"].includes(v))return alert("娃類限購數量請輸入 1 或 2");
-orderLimits[c]=v;renderItems();
-};
+      const d=document.createElement("div");
+      d.className="type-divider";
 
-/* 尚未確認數量時維持全部商品原排列 */
-if(!orderLimits[c]){grid(a);return}
+      const title=document.createElement("span");
+      title.textContent=c;
+      d.appendChild(title);
 
-const plan=document.createElement("div");plan.className="auto-order-wrap";box.appendChild(plan);
+      if(["pending","latest","reminder"].includes(currentTab)){
+        const btn=document.createElement("button");
+        btn.className="category-add-all";
+        btn.textContent="➕";
+        btn.onclick=e=>addCategoryToCart(e,c);
+        d.appendChild(btn);
 
-/* 已購買 ✓、缺貨 ❌、天貓都不進排單；只有完全無標記的卡才排單 */
-const planItems=a.filter(i=>!isTmall(i)&&!(statusMap.get(i)||""));
-const excludedItems=a.filter(i=>isTmall(i)||(statusMap.get(i)||""));
-renderOrderPlan(plan,planItems,orderLimits[c],card);
-if(excludedItems.length)grid(excludedItems);
-return;
-}
-}
-box.appendChild(d);grid(a);
-});
-}else grid(items);
+        if(planGroup(a)){
+          const input=document.createElement("input");
+          input.className="order-limit-input";
+          input.type="number";
+          input.min="1";
+          input.max="2";
+          input.inputMode="numeric";
+          input.placeholder="數量";
+          input.title="只限制吊娃／娃，每車可放 1 或 2 個";
+          input.value=orderLimits[c]||"";
+          d.appendChild(input);
+
+          const confirmBtn=document.createElement("button");
+          confirmBtn.className="order-limit-confirm";
+          confirmBtn.textContent="確認";
+          d.appendChild(confirmBtn);
+
+          box.appendChild(d);
+
+          input.oninput=()=>{
+            let v=String(input.value||"").replace(/[^12]/g,"");
+            if(v.length>1)v=v.slice(-1);
+            input.value=v;
+          };
+
+          confirmBtn.onclick=()=>{
+            const v=String(input.value||"").trim();
+            if(!v){delete orderLimits[c];renderItems();return}
+            if(!["1","2"].includes(v))return alert("娃類限購數量請輸入 1 或 2");
+            orderLimits[c]=v;
+            renderItems();
+          };
+
+          if(!orderLimits[c]){
+            grid(a);
+            return;
+          }
+
+          const plan=document.createElement("div");
+          plan.className="auto-order-wrap";
+          box.appendChild(plan);
+
+          const planItems=a.filter(i=>!isTmall(i)&&!(statusMap.get(i)||""));
+          const excludedItems=a.filter(i=>isTmall(i)||(statusMap.get(i)||""));
+
+          renderOrderPlan(plan,planItems,orderLimits[c],card);
+          if(excludedItems.length)grid(excludedItems);
+          return;
+        }
+      }
+
+      box.appendChild(d);
+      grid(a);
+    });
+
+  }else{
+    grid(items);
+  }
 }
 
 function createCard(item,status=""){

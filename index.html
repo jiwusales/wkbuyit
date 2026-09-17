@@ -196,170 +196,346 @@ function renderTabs(){
 document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("");
 }
 
-async function getSheet(sheet){
-if(sheetCache[sheet])return sheetCache[sheet];
-const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&headers=1`;
-const t=await fetch(url).then(r=>r.text()),data=JSON.parse(t.substr(47).slice(0,-2)),L=(data.table.cols||[]).map(c=>String(c.label||"").trim());
-const C={ip:col(L,"IP"),role:col(L,"角色"),type:col(L,"種類"),name:col(L,"名稱"),originalPrice:col(L,"原價"),stock:col(L,"庫存"),sn:col(L,"貨號"),img:col(L,"圖片","首圖"),url:col(L,"商品網址","網址"),status:col(L,"狀態"),group:col(L,"團名"),source:col(L,"來源"),customer:col(L,"顧客名稱","購買人","訂購人")};
-return sheetCache[sheet]=data.table.rows.map(r=>({ip:getV(r,C.ip),role:getV(r,C.role),type:getV(r,C.type),name:getV(r,C.name),originalPrice:getV(r,C.originalPrice),colStock:getV(r,C.stock),sn:getV(r,C.sn),img:getV(r,C.img),url:getV(r,C.url),status:getV(r,C.status),group:getV(r,C.group),source:getV(r,C.source),customer:getV(r,C.customer)}));
+function findCol(headers,exact=[],partial=[]){
+  let i=col(headers,...exact);
+  if(i>=0)return i;
+  const p=partial.map(norm);
+  return headers.findIndex(h=>p.some(x=>norm(h).includes(x)));
+}
+
+async function getSheet(sheet,force=false){
+  if(!force&&sheetCache[sheet])return sheetCache[sheet];
+
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&headers=1&_=${Date.now()}`;
+  const t=await fetch(url,{cache:"no-store"}).then(r=>r.text());
+  const data=JSON.parse(t.substr(47).slice(0,-2));
+  const L=(data.table.cols||[]).map(c=>String(c.label||"").trim());
+
+  const C={
+    ip:findCol(L,["IP"]),
+    role:findCol(L,["角色"]),
+    type:findCol(L,["種類","類型"]),
+    name:findCol(L,["名稱","商品名稱","品名"]),
+    originalPrice:findCol(L,["原價","商品原價","日幣原價"]),
+    stock:findCol(L,["庫存"]),
+    sn:findCol(L,["貨號","商品貨號","商品編號","品番","SKU","sku"],["貨號","SKU","品番"]),
+    img:findCol(L,["圖片","首圖","圖片網址"]),
+    url:findCol(L,["商品網址","網址","URL","url","商品URL"],["商品網址","URL"]),
+    status:findCol(L,["狀態"]),
+    group:findCol(L,["團名"]),
+    source:findCol(L,["來源"]),
+    customer:findCol(L,["顧客名稱","購買人","訂購人"])
+  };
+
+  const rows=(data.table.rows||[]).map(r=>({
+    ip:getV(r,C.ip),
+    role:getV(r,C.role),
+    type:getV(r,C.type),
+    name:getV(r,C.name),
+    originalPrice:getV(r,C.originalPrice),
+    colStock:getV(r,C.stock),
+    sn:getV(r,C.sn),
+    img:getV(r,C.img),
+    url:getV(r,C.url),
+    status:getV(r,C.status),
+    group:getV(r,C.group),
+    source:getV(r,C.source),
+    customer:getV(r,C.customer)
+  }));
+
+  sheetCache[sheet]=rows;
+  return rows;
 }
 
 async function loadOrderedCounts(){
-const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("已訂購清單")}&headers=1`;
-const t=await fetch(url).then(r=>r.text()),d=JSON.parse(t.substr(47).slice(0,-2));
-const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
-const S=col(L,"貨號"),N=col(L,"名稱"),Q=col(L,"數量"),O=col(L,"缺貨");
-const ok={},bad={};
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("已訂購清單")}&headers=1&_=${Date.now()}`;
+  const t=await fetch(url,{cache:"no-store"}).then(r=>r.text());
+  const d=JSON.parse(t.substr(47).slice(0,-2));
+  const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
 
-(d.table.rows||[]).forEach(r=>{
-const sn=getV(r,S),name=getV(r,N);
-if(!sn&&!name)return;
-const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
-ok[key]=(ok[key]||0)+(Number(getV(r,Q))||0);
-bad[key]=(bad[key]||0)+(Number(getV(r,O))||0);
-});
+  const S=findCol(L,["貨號","商品貨號","SKU"],["貨號","SKU"]);
+  const N=findCol(L,["名稱","商品名稱","品名"]);
+  const Q=findCol(L,["數量"]);
+  const O=findCol(L,["缺貨"]);
 
-orderedCounts=ok;
-soldOutCounts=bad;
+  const ok={},bad={};
+
+  (d.table.rows||[]).forEach(r=>{
+    const sn=getV(r,S),name=getV(r,N);
+    if(!sn&&!name)return;
+
+    const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
+    ok[key]=(ok[key]||0)+(Number(getV(r,Q))||0);
+    bad[key]=(bad[key]||0)+(Number(getV(r,O))||0);
+  });
+
+  orderedCounts=ok;
+  soldOutCounts=bad;
+}
+
+function productUrlKey(v){
+  try{
+    const u=new URL(String(v||"").trim());
+
+    // 不比較 ?variant=xxx 之類 query
+    // 避免同一商品網址因參數不同而比對失敗
+    return u.hostname.replace(/^www\./,"").toLowerCase()+u.pathname.replace(/\/+$/,"");
+  }catch{
+    return norm(v);
+  }
 }
 
 function findStock(item,stock){
-const sn=norm(item.sn);
-if(sn){const s=stock.find(x=>norm(x.sn)===sn);if(s)return s}
-const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`);
-return stock.find(x=>(norm(x.name)===name&&norm(x.role)===role)||norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full)||null;
+  const sn=norm(item.sn);
+
+  // ① 貨號完全相同
+  if(sn){
+    const s=stock.find(x=>norm(x.sn)===sn);
+    if(s)return s;
+  }
+
+  // ② 商品網址相同
+  // もぐもぐ本舖如果線上銷售暫時沒抓到貨號，可從商品庫存／最新開團補
+  const url=productUrlKey(item.url);
+  if(url){
+    const s=stock.find(x=>productUrlKey(x.url)===url);
+    if(s)return s;
+  }
+
+  // ③ 名稱＋角色
+  const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`);
+
+  return stock.find(x=>
+    (norm(x.name)===name&&norm(x.role)===role)||
+    norm(`${x.name}${x.role}`)===full||
+    norm(`${x.role}${x.name}`)===full
+  )||null;
 }
 
 function mergeStock(item,stock){
-const s=findStock(item,stock);
-return{...item,ip:item.ip||s?.ip||"",role:item.role||s?.role||"",type:item.type||s?.type||"",img:s?.img||item.img,url:item.url||s?.url||"",sn:item.sn||s?.sn||"",originalPrice:s?.originalPrice||""};
+  const s=findStock(item,stock);
+
+  return{
+    ...item,
+    ip:item.ip||s?.ip||"",
+    role:item.role||s?.role||"",
+    type:item.type||s?.type||"",
+    img:s?.img||item.img||"",
+    url:item.url||s?.url||"",
+    sn:item.sn||s?.sn||"",
+    originalPrice:s?.originalPrice||item.originalPrice||""
+  };
 }
 
 function mergeLatestPrice(item,latest){
-const s=findStock(item,latest);
-return{...item,img:s?.img||item.img,originalPrice:s?.originalPrice||item.originalPrice||""};
+  const s=findStock(item,latest);
+
+  return{
+    ...item,
+    img:s?.img||item.img||"",
+    sn:item.sn||s?.sn||"",
+    url:item.url||s?.url||"",
+    originalPrice:s?.originalPrice||item.originalPrice||""
+  };
 }
 
 const imageCache={};
 
 async function getProductImage(url){
-if(!url)return"";
-if(imageCache[url]!==undefined)return imageCache[url];
+  if(!url)return"";
+  if(imageCache[url]!==undefined)return imageCache[url];
 
-try{
-const u=new URL(url),m=u.pathname.match(/\/products\/([^/?#]+)/);
+  try{
+    const u=new URL(url);
+    const m=u.pathname.match(/\/products\/([^/?#]+)/);
 
-if(m){
-try{
-const r=await fetch(`${u.origin}/products/${m[1]}.js`);
-if(r.ok){
-const p=await r.json();
-const img=p.featured_image||p.images?.[0]||"";
-if(img)return imageCache[url]=String(img).replace(/^\/\//,"https://");
-}
-}catch{}
-}
+    if(m){
+      try{
+        const r=await fetch(`${u.origin}/products/${m[1]}.js`);
 
-const r=await fetch(url);
-if(!r.ok)return imageCache[url]="";
+        if(r.ok){
+          const p=await r.json();
+          const img=p.featured_image||p.images?.[0]||"";
 
-const html=await r.text();
-const d=new DOMParser().parseFromString(html,"text/html");
-const img=
-d.querySelector('meta[property="og:image:secure_url"]')?.content||
-d.querySelector('meta[property="og:image"]')?.content||
-d.querySelector('meta[name="twitter:image"]')?.content||
-"";
+          if(img){
+            return imageCache[url]=String(img).replace(/^\/\//,"https://");
+          }
+        }
+      }catch{}
+    }
 
-return imageCache[url]=img?new URL(img,url).href:"";
-}catch{
-return imageCache[url]="";
-}
+    const r=await fetch(url);
+    if(!r.ok)return imageCache[url]="";
+
+    const html=await r.text();
+    const d=new DOMParser().parseFromString(html,"text/html");
+
+    const img=
+      d.querySelector('meta[property="og:image:secure_url"]')?.content||
+      d.querySelector('meta[property="og:image"]')?.content||
+      d.querySelector('meta[name="twitter:image"]')?.content||
+      "";
+
+    return imageCache[url]=img?new URL(img,url).href:"";
+
+  }catch{
+    return imageCache[url]="";
+  }
 }
 
 async function fillMissingImages(rows){
-await Promise.all(rows.map(async i=>{
-if(!i.img&&i.url)i.img=await getProductImage(i.url);
-}));
-return rows;
+  await Promise.all(rows.map(async i=>{
+    if(!i.img&&i.url)i.img=await getProductImage(i.url);
+  }));
+
+  return rows;
 }
 
 function filterNormal(rows,key){
-const ok=i=>["0","1"].includes(i.colStock);
-if(key==="chiikawa")return rows.filter(i=>i.name&&ok(i)&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
-if(key==="nagano")return rows.filter(i=>i.name&&ok(i)&&i.ip==="ナガノ"&&originOf(i.url)===SITES.nagano);
-return rows.filter(i=>i.name&&ok(i)&&i.ip==="ちいかわ"&&originOf(i.url)===SITES.mogu);
+  const ok=i=>["0","1"].includes(i.colStock);
+
+  if(key==="chiikawa"){
+    return rows.filter(i=>
+      i.name&&
+      ok(i)&&
+      ["ちいかわ","ちいかわ樂園"].includes(i.ip)&&
+      originOf(i.url)===SITES.chiikawa
+    );
+  }
+
+  if(key==="nagano"){
+    return rows.filter(i=>
+      i.name&&
+      ok(i)&&
+      i.ip==="ナガノ"&&
+      originOf(i.url)===SITES.nagano
+    );
+  }
+
+  return rows.filter(i=>
+    i.name&&
+    ok(i)&&
+    i.ip==="ちいかわ"&&
+    originOf(i.url)===SITES.mogu
+  );
 }
 
 async function switchTab(key){
-currentTab=key;selectedTypes=[];selectedRole=null;
-localStorage.setItem("jiwu_helper_tab",key);
-window.scrollTo(0,0);
-document.body.classList.toggle("latest-tab",key==="latest"||key==="reminder");
-renderTabs();
+  currentTab=key;
+  selectedTypes=[];
+  selectedRole=null;
 
-document.querySelector(".nav-bar-wrapper").style.display="flex";
-document.querySelector(".filter-bar-wrapper").style.display=["pending","latest","reminder"].includes(key)?"none":"flex";
-document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
+  localStorage.setItem("jiwu_helper_tab",key);
+  window.scrollTo(0,0);
 
-try{
-let rows=await getSheet(TABS[key].sheet),stock;
-await loadOrderedCounts();
+  document.body.classList.toggle("latest-tab",key==="latest"||key==="reminder");
+  renderTabs();
 
-if(key==="pending"){
-stock=await getSheet("商品庫存");
-rows=rows.filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group)).map(i=>mergeStock(i,stock));
-const groupSite={};
-rows.forEach(i=>{const o=originOf(i.url);if(i.group&&ALLOWED.includes(o))groupSite[norm(i.group)]=o});
-rows=rows.filter(i=>ALLOWED.includes(originOf(i.url))||(i.group&&groupSite[norm(i.group)]))
-.map(i=>({...i,_siteOrigin:originOf(i.url)||groupSite[norm(i.group)]||""}));
+  document.querySelector(".nav-bar-wrapper").style.display="flex";
+  document.querySelector(".filter-bar-wrapper").style.display=["pending","latest","reminder"].includes(key)?"none":"flex";
+  document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
-}else if(key==="latest"||key==="reminder"){
-stock=await getSheet("商品庫存");
-const latest=await getSheet("最新開團");
+  try{
+    // 線上銷售每次重新抓最新資料
+    let rows=await getSheet(TABS[key].sheet,true),stock;
 
-rows=rows
-.filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
-.map(i=>mergeStock(i,stock))
-.map(i=>mergeLatestPrice(i,latest));
+    await loadOrderedCounts();
 
-const latestGroups=new Set(
-rows.filter(i=>i.group&&i.sn&&i.url).map(i=>norm(i.group))
-);
+    if(key==="pending"){
+      // 商品庫存也強制重新抓，避免剛回填貨號卻仍用舊快取
+      stock=await getSheet("商品庫存",true);
 
-if(key==="latest"){
-rows=rows.filter(i=>i.group?latestGroups.has(norm(i.group)):i.sn&&i.url);
-}else{
-rows=rows.filter(i=>i.group?!latestGroups.has(norm(i.group)):!i.sn||!i.url);
-}
+      rows=rows
+        .filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group))
+        .map(i=>mergeStock(i,stock));
 
-}else rows=filterNormal(rows,key);
+      const groupSite={};
 
-rows=await fillMissingImages(rows);
+      rows.forEach(i=>{
+        const o=originOf(i.url);
+        if(i.group&&ALLOWED.includes(o))groupSite[norm(i.group)]=o;
+      });
 
-allItems=rows.map(i=>({...i,
-category:key==="pending"
-?siteName(i._siteOrigin||originOf(i.url))
-:(key==="latest"||key==="reminder")
-?(i.group||"其他")
-:(i.role||i.ip||i.group||"其他"),
-type:i.type||"其他"
-}));
+      rows=rows
+        .filter(i=>ALLOWED.includes(originOf(i.url))||(i.group&&groupSite[norm(i.group)]))
+        .map(i=>({...i,_siteOrigin:originOf(i.url)||groupSite[norm(i.group)]||""}));
 
-allCategories=[...new Set(allItems.map(i=>i.category).filter(Boolean))];
-allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
+    }else if(key==="latest"||key==="reminder"){
+      // 兩邊都重新抓，不使用舊 cache
+      stock=await getSheet("商品庫存",true);
+      const latest=await getSheet("最新開團",true);
 
-renderRoleNav();
-if(["pending","latest","reminder"].includes(key))document.getElementById("filter-bar").innerHTML="";
-else renderFilters();
+      rows=rows
+        .filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
+        .map(i=>mergeStock(i,stock))
+        .map(i=>mergeLatestPrice(i,latest));
 
-renderItems();
-requestAnimationFrame(()=>document.getElementById("card-container").style.paddingTop=40+document.querySelector(".header-fixed").offsetHeight+"px");
+      /*
+        同一團只要任一商品已經同時有：
+        1. 團名
+        2. 貨號
+        3. 商品網址
 
-}catch(e){
-console.error(e);
-document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>";
-}
+        整團就進「開團待訂區」
+      */
+      const latestGroups=new Set(
+        rows
+          .filter(i=>norm(i.group)&&norm(i.sn)&&String(i.url||"").trim())
+          .map(i=>norm(i.group))
+      );
+
+      if(key==="latest"){
+        rows=rows.filter(i=>
+          i.group
+            ?latestGroups.has(norm(i.group))
+            :norm(i.sn)&&String(i.url||"").trim()
+        );
+      }else{
+        rows=rows.filter(i=>
+          i.group
+            ?!latestGroups.has(norm(i.group))
+            :!norm(i.sn)||!String(i.url||"").trim()
+        );
+      }
+
+    }else{
+      rows=filterNormal(rows,key);
+    }
+
+    rows=await fillMissingImages(rows);
+
+    allItems=rows.map(i=>({
+      ...i,
+      category:key==="pending"
+        ?siteName(i._siteOrigin||originOf(i.url))
+        :(key==="latest"||key==="reminder")
+          ?(i.group||"其他")
+          :(i.role||i.ip||i.group||"其他"),
+      type:i.type||"其他"
+    }));
+
+    allCategories=[...new Set(allItems.map(i=>i.category).filter(Boolean))];
+    allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
+
+    renderRoleNav();
+
+    if(["pending","latest","reminder"].includes(key)){
+      document.getElementById("filter-bar").innerHTML="";
+    }else{
+      renderFilters();
+    }
+
+    renderItems();
+
+    requestAnimationFrame(()=>{
+      document.getElementById("card-container").style.paddingTop=
+        40+document.querySelector(".header-fixed").offsetHeight+"px";
+    });
+
+  }catch(e){
+    console.error(e);
+    document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>";
+  }
 }
 
 function normalTab(){return["chiikawa","nagano","mogu"].includes(currentTab)}

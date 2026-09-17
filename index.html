@@ -34,6 +34,8 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .auto-order-grid .card{cursor:grab}.auto-order-grid .card:active{cursor:grabbing}.auto-order-grid .card.dragging{opacity:.35}
 .auto-order-add{width:30px;min-width:30px;height:30px;border:0;border-radius:8px;background:var(--theme);color:#fff;font-size:17px;font-weight:bold;cursor:pointer;margin-top:50px}
 .auto-order-ok{color:#55a36a;font-weight:bold}.auto-order-warn{color:#e78655;font-weight:bold}
+.manual-car-drop{margin:10px 0 18px 30px;min-height:65px;border:2px dashed var(--theme);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--active);font-size:12px;font-weight:bold;background:#fff;transition:.15s}
+.manual-car-drop.drag-over{background:#f8f3ff;border-color:var(--active);transform:scale(1.01)}
 
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
@@ -1236,369 +1238,224 @@ document.addEventListener("click",e=>{
    取代原本排單顯示
 ========================= */
 
-renderOrderPlan=async function(
-  target,
-  items,
-  dollLimit,
-  card
-){
+renderOrderPlan=async function(target,items,dollLimit,card){
   ensureSyncIds();
 
-  const category=
-    target
-      .previousElementSibling
-      ?.querySelector("span")
-      ?.textContent
-      ?.trim()||"";
+  const category=target.previousElementSibling?.querySelector("span")?.textContent?.trim()||"";
 
-  target.innerHTML=
-    "<div style='font-size:11px;color:#999;padding:8px'>同步排單中...</div>";
+  target.innerHTML="<div style='font-size:11px;color:#999;padding:8px'>同步排單中...</div>";
 
   const saved=await loadPlanRemote(category);
-
-  const cars=
-    samePlanItems(items,saved,dollLimit)
-      ?restoreCars(items,saved)
-      :makeOrderPlan(items,dollLimit);
+  const cars=samePlanItems(items,saved,dollLimit)
+    ?restoreCars(items,saved)
+    :makeOrderPlan(items,dollLimit);
 
   if(!target.isConnected)return;
 
   if(!samePlanItems(items,saved,dollLimit)){
-    savePlanRemote(
-      category,
-      cars,
-      dollLimit
-    );
+    savePlanRemote(category,cars,dollLimit);
   }
-
-  target.innerHTML="";
 
   let dragging=null;
 
-  function recalcCar(car){
-    car.total=car.items.reduce(
-      (sum,i)=>sum+yen(i.originalPrice),
-      0
-    );
-
-    car.counts={};
-
-    car.items.forEach(i=>{
-      const key=itemOrderKey(i);
-      car.counts[key]=(car.counts[key]||0)+1;
+  function recalcCar(c){
+    c.total=c.items.reduce((s,i)=>s+yen(i.originalPrice),0);
+    c.counts={};
+    c.items.forEach(i=>{
+      const k=itemOrderKey(i);
+      c.counts[k]=(c.counts[k]||0)+1;
     });
   }
 
-  function updateRow(n){
-    const row=target.querySelector(
-      `.auto-order-row[data-car="${n}"]`
-    );
-
-    if(!row)return;
-
-    const car=cars[n];
-    const ok=car.total>=ORDER_TARGET;
-
-    row.querySelector(
-      ".auto-order-count"
-    ).textContent=`${car.items.length}件`;
-
-    row.querySelector(
-      ".auto-order-total"
-    ).textContent=`¥${fmt(car.total)}`;
-
-    const status=row.querySelector(
-      ".auto-order-status"
-    );
-
-    status.className=
-      `auto-order-status ${
-        ok
-          ?"auto-order-ok"
-          :"auto-order-warn"
-      }`;
-
-    status.textContent=
-      ok
-        ?"✓ 已滿 ¥11,000"
-        :`差 ¥${fmt(ORDER_TARGET-car.total)}`;
+  function save(){
+    savePlanRemote(category,cars,dollLimit);
   }
 
-  function makeDraggable(
-    el,
-    item,
-    carIndex
-  ){
+  function makeDraggable(el,item,carIndex){
     el.draggable=true;
     el.__orderItem=item;
     el.__carIndex=carIndex;
 
-    el.addEventListener(
-      "dragstart",
-      e=>{
-        dragging={
-          el,
-          item,
-          from:el.__carIndex
-        };
+    el.addEventListener("dragstart",e=>{
+      dragging={el,item,from:el.__carIndex};
+      el.classList.add("dragging");
+      e.dataTransfer.effectAllowed="move";
+      try{
+        e.dataTransfer.setData("text/plain",itemOrderKey(item));
+      }catch{}
+    });
 
-        el.classList.add(
-          "dragging"
-        );
-
-        e.dataTransfer.effectAllowed=
-          "move";
-
-        try{
-          e.dataTransfer.setData(
-            "text/plain",
-            itemOrderKey(item)
-          );
-        }catch{}
-      }
-    );
-
-    el.addEventListener(
-      "dragend",
-      ()=>{
-        el.classList.remove(
-          "dragging"
-        );
-
-        target
-          .querySelectorAll(
-            ".auto-order-grid.drag-over"
-          )
-          .forEach(g=>
-            g.classList.remove(
-              "drag-over"
-            )
-          );
-
-        dragging=null;
-      }
-    );
+    el.addEventListener("dragend",()=>{
+      el.classList.remove("dragging");
+      target.querySelectorAll(".drag-over").forEach(x=>x.classList.remove("drag-over"));
+      dragging=null;
+    });
   }
 
-  cars.forEach((car,n)=>{
-    const row=
-      document.createElement("div");
+  function moveToCar(from,to,item){
+    if(from===to)return;
 
-    row.className=
-      "auto-order-row";
+    const key=itemOrderKey(item);
+    const limit=itemCartLimit(item,dollLimit);
+    const current=cars[to].items.filter(x=>itemOrderKey(x)===key).length;
 
+    if(Number.isFinite(limit)&&current>=limit){
+      alert(`娃類商品這一車最多只能放 ${limit} 個`);
+      return;
+    }
+
+    const idx=cars[from].items.indexOf(item);
+    if(idx<0)return;
+
+    cars[from].items.splice(idx,1);
+    cars[to].items.push(item);
+
+    recalcCar(cars[from]);
+    recalcCar(cars[to]);
+
+    if(!cars[from].items.length){
+      cars.splice(from,1);
+    }
+
+    save();
+    renderCars();
+  }
+
+  function addNewCar(from,item){
+    const idx=cars[from]?.items.indexOf(item);
+    if(idx<0)return;
+
+    cars[from].items.splice(idx,1);
+    recalcCar(cars[from]);
+
+    const newCar={
+      items:[item],
+      total:0,
+      counts:{}
+    };
+
+    recalcCar(newCar);
+
+    if(!cars[from].items.length){
+      cars.splice(from,1);
+    }
+
+    cars.push(newCar);
+
+    save();
+    renderCars();
+  }
+
+  function createCarRow(car,n){
+    const row=document.createElement("div");
+    row.className="auto-order-row";
     row.dataset.car=n;
 
-    const ok=
-      car.total>=ORDER_TARGET;
+    const ok=car.total>=ORDER_TARGET;
 
     row.innerHTML=`
-      <div class="auto-order-no">
-        ${n+1}
-      </div>
-
+      <div class="auto-order-no">${n+1}</div>
       <div class="auto-order-main">
-
         <div class="auto-order-meta">
-
-          <span class="auto-order-count">
-            ${car.items.length}件
+          <span class="auto-order-count">${car.items.length}件</span>
+          <span class="auto-order-total">¥${fmt(car.total)}</span>
+          <span class="auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}">
+            ${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-car.total)}`}
           </span>
-
-          <span class="auto-order-total">
-            ¥${fmt(car.total)}
-          </span>
-
-          <span class="auto-order-status ${
-            ok
-              ?"auto-order-ok"
-              :"auto-order-warn"
-          }">
-
-            ${
-              ok
-                ?"✓ 已滿 ¥11,000"
-                :`差 ¥${fmt(
-                    ORDER_TARGET-car.total
-                  )}`
-            }
-
-          </span>
-
         </div>
-
-        <div
-          class="auto-order-grid"
-          data-car="${n}">
-        </div>
-
+        <div class="auto-order-grid" data-car="${n}"></div>
       </div>
-
-      <button class="auto-order-add">
-        ＋
-      </button>
+      <button class="auto-order-add">＋</button>
     `;
 
-    const grid=
-      row.querySelector(
-        ".auto-order-grid"
-      );
+    const grid=row.querySelector(".auto-order-grid");
 
     car.items.forEach(i=>{
       const el=card(i);
-
-      makeDraggable(
-        el,
-        i,
-        n
-      );
-
+      makeDraggable(el,i,n);
       grid.appendChild(el);
     });
 
-    grid.addEventListener(
-      "dragover",
-      e=>{
-        e.preventDefault();
+    grid.addEventListener("dragover",e=>{
+      e.preventDefault();
 
-        if(
-          dragging&&
-          dragging.from!==n
-        ){
-          grid.classList.add(
-            "drag-over"
-          );
-
-          e.dataTransfer.dropEffect=
-            "move";
-        }
+      if(dragging&&dragging.from!==n){
+        grid.classList.add("drag-over");
+        e.dataTransfer.dropEffect="move";
       }
-    );
+    });
 
-    grid.addEventListener(
-      "dragleave",
-      e=>{
-        if(
-          !grid.contains(
-            e.relatedTarget
-          )
-        ){
-          grid.classList.remove(
-            "drag-over"
-          );
-        }
+    grid.addEventListener("dragleave",e=>{
+      if(!grid.contains(e.relatedTarget)){
+        grid.classList.remove("drag-over");
       }
-    );
+    });
 
-    grid.addEventListener(
-      "drop",
-      e=>{
-        e.preventDefault();
+    grid.addEventListener("drop",e=>{
+      e.preventDefault();
+      grid.classList.remove("drag-over");
 
-        grid.classList.remove(
-          "drag-over"
-        );
+      if(!dragging||dragging.from===n)return;
 
-        if(
-          !dragging||
-          dragging.from===n
-        )return;
+      const {from,item}=dragging;
+      dragging=null;
+      moveToCar(from,n,item);
+    });
 
-        const from=
-          dragging.from;
+    row.querySelector(".auto-order-add").onclick=e=>
+      addPlannedCart(car.items,e.currentTarget);
 
-        const to=n;
-
-        const item=
-          dragging.item;
-
-        const key=
-          itemOrderKey(item);
-
-        const limit=
-          itemCartLimit(
-            item,
-            dollLimit
-          );
-
-        const current=
-          cars[to].items.filter(
-            x=>
-              itemOrderKey(x)===
-              key
-          ).length;
-
-        if(
-          Number.isFinite(limit)&&
-          current>=limit
-        ){
-          return alert(
-            `娃類商品這一車最多只能放 ${limit} 個`
-          );
-        }
-
-        const index=
-          cars[from]
-            .items
-            .indexOf(item);
-
-        if(index<0)return;
-
-        cars[from]
-          .items
-          .splice(
-            index,
-            1
-          );
-
-        cars[to]
-          .items
-          .push(item);
-
-        recalcCar(
-          cars[from]
-        );
-
-        recalcCar(
-          cars[to]
-        );
-
-        dragging.el.__carIndex=
-          to;
-
-        grid.appendChild(
-          dragging.el
-        );
-
-        updateRow(from);
-        updateRow(to);
-
-        /* 拖曳完成後自動儲存 */
-        savePlanRemote(
-          category,
-          cars,
-          dollLimit
-        );
-      }
-    );
-
-    row
-      .querySelector(
-        ".auto-order-add"
-      )
-      .onclick=e=>
-        addPlannedCart(
-          car.items,
-          e.currentTarget
-        );
-
-    target.appendChild(row);
-  });
-
-  if(!cars.length){
-    target.innerHTML=
-      "<div style='font-size:11px;color:#999'>沒有可排單商品</div>";
+    return row;
   }
+
+  function createManualDrop(){
+    const drop=document.createElement("div");
+    drop.className="manual-car-drop";
+    drop.innerHTML="＋ 拖曳商品到這裡增加一車";
+
+    drop.addEventListener("dragover",e=>{
+      e.preventDefault();
+
+      if(dragging){
+        drop.classList.add("drag-over");
+        e.dataTransfer.dropEffect="move";
+      }
+    });
+
+    drop.addEventListener("dragleave",e=>{
+      if(!drop.contains(e.relatedTarget)){
+        drop.classList.remove("drag-over");
+      }
+    });
+
+    drop.addEventListener("drop",e=>{
+      e.preventDefault();
+      drop.classList.remove("drag-over");
+
+      if(!dragging)return;
+
+      const {from,item}=dragging;
+      dragging=null;
+
+      addNewCar(from,item);
+    });
+
+    return drop;
+  }
+
+  function renderCars(){
+    target.innerHTML="";
+
+    cars.forEach(recalcCar);
+
+    cars.forEach((car,n)=>{
+      target.appendChild(createCarRow(car,n));
+    });
+
+    target.appendChild(createManualDrop());
+  }
+
+  renderCars();
 };
 </script>
 </body>

@@ -1009,7 +1009,13 @@ window.onload=async()=>{
 
 <script>
 const PLAN_API="https://script.google.com/macros/s/AKfycbwCmtwlK88B8yK2imEUWub_ERY6FLMO0KbYFhfFW64ai5g4NLhizcKQRkUwjWYjvtZQlA/exec";
+
 let remotePlanCache={};
+
+
+/* =========================
+   基本
+========================= */
 
 function planApiReady(){
   return /^https:\/\/script\.google\.com\/macros\/s\//.test(PLAN_API);
@@ -1023,337 +1029,1276 @@ function localPlanKey(key){
   return `jiwu_remote_plan_${key}`;
 }
 
+function clearPlanCache(category){
+  const key=planKey(category);
+
+  delete remotePlanCache[key];
+
+  try{
+    localStorage.removeItem(
+      localPlanKey(key)
+    );
+  }catch{}
+}
+
+
+/* =========================
+   商品同步 ID
+========================= */
+
 function ensureSyncIds(){
+
   const count={};
 
   allItems.forEach(i=>{
+
+    /*
+      不再把網址、原價放進 ID
+      避免價格或網址改變後整份排單失效
+    */
+
     const base=[
       i.group,
       i.sn,
       i.name,
       i.role,
       i.source,
-      i.customer,
-      i.url,
-      i.originalPrice
-    ].map(norm).join("¦");
+      i.customer
+    ]
+    .map(norm)
+    .join("¦");
 
-    const n=count[base]=(count[base]||0)+1;
-    i.__planId=`${base}#${n}`;
+    const n=
+      count[base]=
+        (count[base]||0)+1;
+
+    i.__planId=
+      `${base}#${n}`;
+
   });
+
 }
 
 function itemSyncId(i){
   return i.__planId||"";
 }
 
+
+/* =========================
+   多訂卡
+========================= */
+
 const EXTRA_MARK="::EXTRA::";
 
 function baseSyncId(id){
-  return String(id||"").split(EXTRA_MARK)[0];
+
+  return String(id||"")
+    .split(EXTRA_MARK)[0];
+
 }
+
+
+/* =========================
+   JSONP 讀取 GAS
+========================= */
 
 function jsonp(url){
-  return new Promise((resolve,reject)=>{
-    const cb=`__plan_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const s=document.createElement("script");
 
-    function done(){
-      delete window[cb];
-      s.remove();
+  return new Promise(
+    (resolve,reject)=>{
+
+      const cb=
+        `__plan_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      const s=
+        document.createElement(
+          "script"
+        );
+
+
+      function done(){
+
+        delete window[cb];
+
+        s.remove();
+
+      }
+
+
+      window[cb]=data=>{
+
+        done();
+
+        resolve(data);
+
+      };
+
+
+      s.onerror=()=>{
+
+        done();
+
+        reject(
+          new Error(
+            "同步讀取失敗"
+          )
+        );
+
+      };
+
+
+      s.src=
+        `${url}${url.includes("?")?"&":"?"}callback=${cb}`;
+
+
+      document.head
+        .appendChild(s);
+
     }
+  );
 
-    window[cb]=data=>{
-      done();
-      resolve(data);
-    };
-
-    s.onerror=()=>{
-      done();
-      reject(new Error("同步讀取失敗"));
-    };
-
-    s.src=`${url}${url.includes("?")?"&":"?"}callback=${cb}`;
-    document.head.appendChild(s);
-  });
 }
 
-async function loadPlanRemote(category,force=false){
-  if(!planApiReady())return null;
 
-  const key=planKey(category);
+/* =========================
+   讀取排單
+========================= */
 
-  if(!force&&remotePlanCache[key]){
-    return remotePlanCache[key];
+async function loadPlanRemote(
+  category,
+  force=false
+){
+
+  if(!planApiReady()){
+    return null;
   }
 
+
+  const key=
+    planKey(category);
+
+
+  if(
+    !force&&
+    remotePlanCache[key]
+  ){
+
+    return remotePlanCache[key];
+
+  }
+
+
+  /*
+    先讀本機
+  */
+
+  let local=null;
+
   try{
-    const data=await jsonp(
-      `${PLAN_API}?action=loadPlan&key=${encodeURIComponent(key)}&_=${Date.now()}`
-    );
 
-    if(data?.ok&&data.found){
-      remotePlanCache[key]=data;
-
-      localStorage.setItem(
-        localPlanKey(key),
-        JSON.stringify(data)
+    local=
+      JSON.parse(
+        localStorage
+          .getItem(
+            localPlanKey(key)
+          )||"null"
       );
 
-      return data;
+  }catch{}
+
+
+  /*
+    再讀試算表
+  */
+
+  let remote=null;
+
+  try{
+
+    const data=
+      await jsonp(
+        `${PLAN_API}?action=loadPlan&key=${encodeURIComponent(key)}&_=${Date.now()}`
+      );
+
+
+    if(
+      data?.ok&&
+      data.found
+    ){
+
+      remote=data;
+
     }
 
   }catch(e){
-    console.warn("排單同步讀取失敗",e);
-  }
 
-  try{
-    const local=JSON.parse(
-      localStorage.getItem(localPlanKey(key))||"null"
+    console.warn(
+      "排單同步讀取失敗",
+      e
     );
 
-    if(local){
-      remotePlanCache[key]=local;
+  }
+
+
+  /*
+    本機排單比較新
+    → 使用本機
+  */
+
+  if(local){
+
+    const localTime=
+      Number(
+        local.savedAt
+      )||0;
+
+
+    const remoteTime=
+      remote?.updatedAt
+        ?new Date(
+            remote.updatedAt
+          ).getTime()
+        :0;
+
+
+    /*
+      舊版本沒有 savedAt
+      第一次升級先保留本機排單
+    */
+
+    if(
+      !remote||
+      !local.savedAt||
+      localTime>=remoteTime
+    ){
+
+      if(!local.savedAt){
+
+        local.savedAt=
+          Date.now();
+
+      }
+
+      remotePlanCache[key]=
+        local;
+
+
       return local;
+
     }
-  }catch{}
+
+  }
+
+
+  /*
+    試算表比較新
+    → 使用試算表
+  */
+
+  if(remote){
+
+    const remoteTime=
+      remote.updatedAt
+        ?new Date(
+            remote.updatedAt
+          ).getTime()
+        :Date.now();
+
+
+    const cachedRemote={
+
+      ...remote,
+
+      savedAt:
+        Number.isFinite(
+          remoteTime
+        )
+          ?remoteTime
+          :Date.now()
+
+    };
+
+
+    remotePlanCache[key]=
+      cachedRemote;
+
+
+    try{
+
+      localStorage.setItem(
+        localPlanKey(key),
+        JSON.stringify(
+          cachedRemote
+        )
+      );
+
+    }catch{}
+
+
+    return cachedRemote;
+
+  }
+
 
   return null;
+
 }
 
-function savePlanRemote(category,cars,limit){
-  if(!planApiReady())return;
 
-  const key=planKey(category);
+/* =========================
+   儲存排單
+========================= */
+
+function savePlanRemote(
+  category,
+  cars,
+  limit
+){
+
+  if(!planApiReady()){
+    return;
+  }
+
+
+  const key=
+    planKey(category);
+
 
   const body={
+
     action:"savePlan",
+
     key,
-    group:category,
-    limit:String(limit||""),
-    cars:cars.map(c=>c.items.map(itemSyncId))
+
+    group:
+      category,
+
+    limit:
+      String(
+        limit||""
+      ),
+
+    cars:
+      cars.map(
+        c=>
+          c.items.map(
+            itemSyncId
+          )
+      )
+
   };
+
 
   const cache={
+
     ok:true,
+
     found:true,
+
     key,
-    group:category,
-    limit:String(limit||""),
-    cars:body.cars
+
+    group:
+      category,
+
+    limit:
+      String(
+        limit||""
+      ),
+
+    cars:
+      body.cars,
+
+    savedAt:
+      Date.now()
+
   };
 
-  remotePlanCache[key]=cache;
 
-  localStorage.setItem(
-    localPlanKey(key),
-    JSON.stringify(cache)
+  /*
+    先立即存瀏覽器
+    拖完就存
+  */
+
+  remotePlanCache[key]=
+    cache;
+
+
+  try{
+
+    localStorage.setItem(
+      localPlanKey(key),
+      JSON.stringify(
+        cache
+      )
+    );
+
+  }catch{}
+
+
+  /*
+    再同步 GAS
+  */
+
+  const raw=
+    JSON.stringify(
+      body
+    );
+
+
+  const blob=
+    new Blob(
+      [raw],
+      {
+        type:
+          "text/plain;charset=utf-8"
+      }
+    );
+
+
+  /*
+    優先用 sendBeacon
+    刷新頁面時也比較不容易中斷
+  */
+
+  if(
+    navigator.sendBeacon
+  ){
+
+    try{
+
+      if(
+        navigator.sendBeacon(
+          PLAN_API,
+          blob
+        )
+      ){
+
+        return;
+
+      }
+
+    }catch{}
+
+  }
+
+
+  fetch(
+    PLAN_API,
+    {
+
+      method:"POST",
+
+      headers:{
+        "Content-Type":
+          "text/plain;charset=utf-8"
+      },
+
+      body:
+        raw,
+
+      mode:
+        "no-cors",
+
+      keepalive:
+        true
+
+    }
+  )
+  .catch(
+    e=>
+      console.warn(
+        "排單同步儲存失敗",
+        e
+      )
   );
 
-  fetch(PLAN_API,{
-    method:"POST",
-    headers:{
-      "Content-Type":"text/plain;charset=utf-8"
-    },
-    body:JSON.stringify(body),
-    mode:"no-cors",
-    keepalive:true
-  }).catch(e=>{
-    console.warn("排單同步儲存失敗",e);
-  });
 }
 
-function deletePlanRemote(category){
-  if(!planApiReady())return;
 
-  const key=planKey(category);
+/* =========================
+   刪除排單
+========================= */
+
+function deletePlanRemote(
+  category
+){
+
+  if(!planApiReady()){
+    return;
+  }
+
+
+  const key=
+    planKey(category);
+
 
   delete remotePlanCache[key];
 
-  localStorage.removeItem(
-    localPlanKey(key)
-  );
 
-  fetch(PLAN_API,{
-    method:"POST",
-    headers:{
-      "Content-Type":"text/plain;charset=utf-8"
-    },
-    body:JSON.stringify({
-      action:"deletePlan",
+  try{
+
+    localStorage.removeItem(
+      localPlanKey(key)
+    );
+
+  }catch{}
+
+
+  const raw=
+    JSON.stringify({
+
+      action:
+        "deletePlan",
+
       key
-    }),
-    mode:"no-cors",
-    keepalive:true
-  }).catch(()=>{});
-}
 
-function samePlanItems(items,plan,limit){
+    });
+
+
+  const blob=
+    new Blob(
+      [raw],
+      {
+        type:
+          "text/plain;charset=utf-8"
+      }
+    );
+
+
   if(
-    !plan||
-    String(plan.limit)!==String(limit)
-  )return false;
+    navigator.sendBeacon
+  ){
 
-  const current=items
-    .map(itemSyncId)
-    .sort();
+    try{
 
-  const saved=(plan.cars||[])
-    .flat()
-    .map(String)
-    .filter(id=>!id.includes(EXTRA_MARK))
-    .sort();
+      if(
+        navigator.sendBeacon(
+          PLAN_API,
+          blob
+        )
+      ){
 
-  return(
-    current.length===saved.length&&
-    current.every((x,n)=>x===saved[n])
-  );
+        return;
+
+      }
+
+    }catch{}
+
+  }
+
+
+  fetch(
+    PLAN_API,
+    {
+
+      method:"POST",
+
+      headers:{
+        "Content-Type":
+          "text/plain;charset=utf-8"
+      },
+
+      body:
+        raw,
+
+      mode:
+        "no-cors",
+
+      keepalive:
+        true
+
+    }
+  )
+  .catch(()=>{});
+
 }
 
-function restoreCars(items,plan){
-  const map=new Map(
-    items.map(i=>[
-      itemSyncId(i),
-      i
-    ])
-  );
 
-  return (plan.cars||[])
-    .map(ids=>{
+/* =========================
+   舊 ID 解析
+========================= */
 
-      const list=ids
-        .map(id=>{
-          id=String(id);
+function savedPlanParts(
+  savedId
+){
 
-          if(map.has(id)){
-            return map.get(id);
+  let s=
+    baseSyncId(
+      savedId
+    )
+    .replace(
+      /#\d+$/,
+      ""
+    );
+
+
+  const p=
+    s.split("¦");
+
+
+  return{
+
+    group:
+      norm(p[0]),
+
+    sn:
+      norm(p[1]),
+
+    name:
+      norm(p[2]),
+
+    role:
+      norm(p[3]),
+
+    source:
+      norm(p[4]),
+
+    customer:
+      norm(p[5])
+
+  };
+
+}
+
+
+/* =========================
+   找回原商品
+========================= */
+
+function findSavedItem(
+  savedId,
+  items,
+  used
+){
+
+  const raw=
+    baseSyncId(
+      savedId
+    );
+
+
+  /*
+    第一優先：
+    ID 完全相同
+  */
+
+  let item=
+    items.find(
+      i=>
+
+        !used.has(i)&&
+
+        itemSyncId(i)===
+          raw
+    );
+
+
+  if(item){
+    return item;
+  }
+
+
+  /*
+    舊 ID 不一致
+    用商品資料重新比對
+  */
+
+  const x=
+    savedPlanParts(
+      raw
+    );
+
+
+  item=
+    items.find(
+      i=>{
+
+        if(
+          used.has(i)
+        ){
+          return false;
+        }
+
+
+        if(
+          x.group&&
+          norm(i.group)!==
+            x.group
+        ){
+
+          return false;
+
+        }
+
+
+        /*
+          有貨號優先貨號
+        */
+
+        if(x.sn){
+
+          if(
+            norm(i.sn)!==
+              x.sn
+          ){
+
+            return false;
+
           }
 
-          if(id.includes(EXTRA_MARK)){
-            const base=
-              map.get(baseSyncId(id));
+        }else{
 
-            if(base){
-              return{
-                ...base,
+          if(
+            norm(i.name)!==
+              x.name
+          ){
 
-                /* 多訂卡不顯示原客人 */
-                source:"",
-                customer:"",
+            return false;
 
-                __planId:id,
-                __extra:true
-              };
+          }
+
+
+          if(
+            x.role&&
+            norm(i.role)!==
+              x.role
+          ){
+
+            return false;
+
+          }
+
+        }
+
+
+        /*
+          同商品不同客人
+          仍要分開
+        */
+
+        if(
+          x.source&&
+          norm(i.source)!==
+            x.source
+        ){
+
+          return false;
+
+        }
+
+
+        if(
+          x.customer&&
+          norm(i.customer)!==
+            x.customer
+        ){
+
+          return false;
+
+        }
+
+
+        return true;
+
+      }
+    );
+
+
+  return item||null;
+
+}
+
+
+/* =========================
+   重算車
+========================= */
+
+function recalcRestoredCar(
+  car
+){
+
+  car.total=
+    car.items.reduce(
+      (sum,i)=>
+        sum+
+        yen(
+          i.originalPrice
+        ),
+      0
+    );
+
+
+  car.counts={};
+
+
+  car.items.forEach(
+    i=>{
+
+      const key=
+        itemOrderKey(i);
+
+
+      car.counts[key]=
+        (car.counts[key]||0)+1;
+
+    }
+  );
+
+}
+
+
+/* =========================
+   安全還原排單
+========================= */
+
+function restoreCarsSafely(
+  items,
+  plan,
+  dollLimit
+){
+
+  const cars=[];
+
+  const used=
+    new Set();
+
+
+  /*
+    先完全照舊車序還原
+  */
+
+  (plan?.cars||[])
+    .forEach(
+      ids=>{
+
+        const list=[];
+
+
+        (ids||[])
+          .forEach(
+            savedId=>{
+
+              const raw=
+                String(
+                  savedId||""
+                );
+
+
+              /*
+                多訂卡
+              */
+
+              if(
+                raw.includes(
+                  EXTRA_MARK
+                )
+              ){
+
+                const baseItem=
+                  findSavedItem(
+                    baseSyncId(
+                      raw
+                    ),
+                    items,
+                    new Set()
+                  );
+
+
+                if(baseItem){
+
+                  list.push({
+
+                    ...baseItem,
+
+                    /*
+                      多訂品不屬於客人
+                    */
+
+                    source:"",
+                    customer:"",
+
+                    __planId:
+                      raw,
+
+                    __extra:
+                      true
+
+                  });
+
+                }
+
+
+                return;
+
+              }
+
+
+              /*
+                原本商品
+              */
+
+              const item=
+                findSavedItem(
+                  raw,
+                  items,
+                  used
+                );
+
+
+              if(item){
+
+                used.add(
+                  item
+                );
+
+
+                list.push(
+                  item
+                );
+
+              }
+
             }
-          }
+          );
 
-          return null;
-        })
-        .filter(Boolean);
 
-      const car={
-        items:list,
-        total:0,
-        counts:{}
-      };
+        /*
+          空車不用留
+        */
 
-      car.total=list.reduce(
-        (sum,i)=>
-          sum+yen(i.originalPrice),
-        0
-      );
+        if(
+          list.length
+        ){
 
-      list.forEach(i=>{
-        const key=
-          itemOrderKey(i);
+          const car={
 
-        car.counts[key]=
-          (car.counts[key]||0)+1;
-      });
+            items:
+              list,
 
-      return car;
-    })
-    .filter(c=>c.items.length);
+            total:
+              0,
+
+            counts:{}
+
+          };
+
+
+          recalcRestoredCar(
+            car
+          );
+
+
+          cars.push(
+            car
+          );
+
+        }
+
+      }
+    );
+
+
+  /*
+    找出新增加的商品
+  */
+
+  const newItems=
+    items.filter(
+      i=>
+        !used.has(i)
+    );
+
+
+  /*
+    新商品才補進現有排單
+    舊商品完全不搬
+  */
+
+  newItems.forEach(
+    item=>{
+
+      const key=
+        itemOrderKey(
+          item
+        );
+
+
+      const limit=
+        itemCartLimit(
+          item,
+          dollLimit
+        );
+
+
+      const choices=
+        cars
+          .map(
+            (car,n)=>({
+
+              car,
+
+              n,
+
+              count:
+                car.items
+                  .filter(
+                    x=>
+                      itemOrderKey(x)===
+                      key
+                  )
+                  .length
+
+            })
+          )
+          .filter(
+            x=>
+
+              !Number.isFinite(
+                limit
+              )||
+
+              x.count<
+                limit
+          );
+
+
+      /*
+        找得到可放的車
+      */
+
+      if(
+        choices.length
+      ){
+
+        choices.sort(
+          (a,b)=>
+            a.car.total-
+            b.car.total
+        );
+
+
+        const target=
+          choices[0].car;
+
+
+        target.items
+          .push(
+            item
+          );
+
+
+        recalcRestoredCar(
+          target
+        );
+
+      }else{
+
+        /*
+          都已經達限購
+          → 新增一車
+        */
+
+        const newCar={
+
+          items:[
+            item
+          ],
+
+          total:0,
+
+          counts:{}
+
+        };
+
+
+        recalcRestoredCar(
+          newCar
+        );
+
+
+        cars.push(
+          newCar
+        );
+
+      }
+
+    }
+  );
+
+
+  /*
+    完全沒有可還原資料
+    才重新自動排
+  */
+
+  if(
+    !cars.length&&
+    items.length
+  ){
+
+    return makeOrderPlan(
+      items,
+      dollLimit
+    );
+
+  }
+
+
+  return cars;
+
 }
+
+
+/* =========================
+   讀取每團限購數量
+========================= */
 
 async function loadSyncedOrderLimits(){
 
   if(
-    !["pending","latest","reminder"]
-      .includes(currentTab)||
+    ![
+      "pending",
+      "latest",
+      "reminder"
+    ].includes(
+      currentTab
+    )||
     !planApiReady()
-  )return;
+  ){
+
+    return;
+
+  }
+
 
   ensureSyncIds();
 
+
   await Promise.all(
+
     allCategories.map(
       async category=>{
 
         const plan=
-          await loadPlanRemote(category);
+          await loadPlanRemote(
+            category
+          );
+
 
         if(
           plan&&
           ["1","2"]
             .includes(
-              String(plan.limit)
+              String(
+                plan.limit
+              )
             )
         ){
+
           orderLimits[category]=
-            String(plan.limit);
+            String(
+              plan.limit
+            );
+
         }
 
       }
     )
+
   );
+
 }
 
 
 /* =========================
-   切換分頁後讀取同步排單
+   切換頁面
 ========================= */
 
 const __originalSwitchTab=
   switchTab;
 
-switchTab=async function(key){
 
-  await __originalSwitchTab(key);
+switchTab=
+async function(key){
+
+  /*
+    避免上一頁舊限購設定
+    先觸發一次舊排單
+  */
 
   if(
-    !["pending","latest","reminder"]
-      .includes(currentTab)
-  )return;
+    [
+      "pending",
+      "latest",
+      "reminder"
+    ].includes(key)
+  ){
+
+    orderLimits={};
+
+  }
+
+
+  await __originalSwitchTab(
+    key
+  );
+
+
+  if(
+    ![
+      "pending",
+      "latest",
+      "reminder"
+    ].includes(
+      currentTab
+    )
+  ){
+
+    return;
+
+  }
+
 
   remotePlanCache={};
 
+
   ensureSyncIds();
+
 
   await loadSyncedOrderLimits();
 
+
   renderItems();
 
-  requestAnimationFrame(()=>{
-    document
-      .getElementById(
-        "card-container"
-      )
-      .style
-      .paddingTop=
-        40+
-        document
-          .querySelector(
-            ".header-fixed"
-          )
-          .offsetHeight+
-        "px";
-  });
+
+  requestAnimationFrame(
+    ()=>{
+
+      document
+        .getElementById(
+          "card-container"
+        )
+        .style
+        .paddingTop=
+
+          40+
+
+          document
+            .querySelector(
+              ".header-fixed"
+            )
+            .offsetHeight+
+
+          "px";
+
+    }
+  );
+
 };
 
 
 /* =========================
-   限購數量確認
+   限購確認
 ========================= */
 
 document.addEventListener(
@@ -1366,18 +2311,27 @@ document.addEventListener(
         ?.contains(
           "order-limit-confirm"
         )
-    )return;
+    ){
+
+      return;
+
+    }
+
 
     const divider=
       e.target.closest(
         ".type-divider"
       );
 
+
     const category=
       divider
-        ?.querySelector("span")
+        ?.querySelector(
+          "span"
+        )
         ?.textContent
         ?.trim();
+
 
     const value=
       divider
@@ -1387,7 +2341,24 @@ document.addEventListener(
         ?.value
         ?.trim();
 
-    if(!category)return;
+
+    if(!category){
+      return;
+    }
+
+
+    const oldValue=
+      String(
+        orderLimits[
+          category
+        ]||""
+      );
+
+
+    /*
+      清空數字
+      → 清除這團排單
+    */
 
     if(!value){
 
@@ -1395,17 +2366,29 @@ document.addEventListener(
         category
       );
 
-    }else{
+      return;
 
-      const key=
-        planKey(category);
+    }
 
-      delete remotePlanCache[key];
 
-      localStorage
-        .removeItem(
-          localPlanKey(key)
-        );
+    /*
+      只有真的從 1 改 2
+      或 2 改 1
+      才清掉快取
+
+      同樣數字再按確認
+      不會破壞排單
+    */
+
+    if(
+      oldValue&&
+      oldValue!==value
+    ){
+
+      clearPlanCache(
+        category
+      );
+
     }
 
   },
@@ -1414,7 +2397,7 @@ document.addEventListener(
 
 
 /* =========================
-   排單
+   排單主程式
 ========================= */
 
 renderOrderPlan=
@@ -1427,80 +2410,135 @@ async function(
 
   ensureSyncIds();
 
+
   const category=
     target
       .previousElementSibling
-      ?.querySelector("span")
+      ?.querySelector(
+        "span"
+      )
       ?.textContent
       ?.trim()||"";
 
+
   target.innerHTML=
     "<div style='font-size:11px;color:#999;padding:8px'>同步排單中...</div>";
+
 
   const saved=
     await loadPlanRemote(
       category
     );
 
-  const cars=
-    samePlanItems(
-      items,
-      saved,
-      dollLimit
-    )
-      ?restoreCars(
-          items,
-          saved
-        )
-      :makeOrderPlan(
-          items,
-          dollLimit
-        );
 
-  if(!target.isConnected)return;
+  let cars;
+
+
+  /*
+    有已儲存排單
+    ＋ 限購數量相同
+
+    → 永遠沿用舊排單
+  */
 
   if(
-    !samePlanItems(
-      items,
-      saved,
+    saved&&
+    Array.isArray(
+      saved.cars
+    )&&
+    saved.cars.length&&
+    String(
+      saved.limit
+    )===
+    String(
       dollLimit
     )
   ){
-    savePlanRemote(
-      category,
-      cars,
-      dollLimit
-    );
+
+    cars=
+      restoreCarsSafely(
+        items,
+        saved,
+        dollLimit
+      );
+
+  }else{
+
+    /*
+      第一次排
+      或限購數量真的修改
+
+      才自動重新排
+    */
+
+    cars=
+      makeOrderPlan(
+        items,
+        dollLimit
+      );
+
   }
+
+
+  if(
+    !target.isConnected
+  ){
+
+    return;
+
+  }
+
+
+  /*
+    還原完立即存一次
+    新商品補進去後
+    試算表也同步更新
+  */
+
+  savePlanRemote(
+    category,
+    cars,
+    dollLimit
+  );
+
 
   let dragging=null;
 
 
-  /* =========================
-     重算單車
-  ========================= */
+/* =========================
+   重算單車
+========================= */
 
-  function recalcCar(c){
+  function recalcCar(
+    car
+  ){
 
-    c.total=
-      c.items.reduce(
+    car.total=
+      car.items.reduce(
         (sum,i)=>
           sum+
-          yen(i.originalPrice),
+          yen(
+            i.originalPrice
+          ),
         0
       );
 
-    c.counts={};
 
-    c.items.forEach(i=>{
+    car.counts={};
 
-      const k=
-        itemOrderKey(i);
 
-      c.counts[k]=
-        (c.counts[k]||0)+1;
+    car.items.forEach(
+      i=>{
 
-    });
+        const key=
+          itemOrderKey(i);
+
+
+        car.counts[key]=
+          (car.counts[key]||0)+1;
+
+      }
+    );
 
   }
 
@@ -1516,45 +2554,58 @@ async function(
   }
 
 
-  /* =========================
-     建立「多訂」複製品
-  ========================= */
+/* =========================
+   建立多訂卡
+========================= */
 
-  function makeExtra(item){
+  function makeExtra(
+    item
+  ){
 
     const base=
       baseSyncId(
-        itemSyncId(item)
+        itemSyncId(
+          item
+        )
       );
 
+
     return{
+
       ...item,
 
-      /* 不屬於任何客人 */
+      /*
+        多訂不屬於客人
+      */
+
       source:"",
       customer:"",
 
+
       /*
-        每一個多訂品有自己的 ID
-        重新整理後才可以辨識
+        多訂卡唯一 ID
       */
+
       __planId:
         `${base}${EXTRA_MARK}${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
 
+
       /*
-        結帳時靠這個判斷：
-        數量不增加
-        已訂購清單「多」+1
+        已訂購清單
+        寫到「多」
       */
-      __extra:true
+
+      __extra:
+        true
+
     };
 
   }
 
 
-  /* =========================
-     按「＋1」
-  ========================= */
+/* =========================
+   ＋1
+========================= */
 
   function duplicateItem(
     item,
@@ -1562,10 +2613,16 @@ async function(
   ){
 
     const copy=
-      makeExtra(item);
+      makeExtra(
+        item
+      );
+
 
     const key=
-      itemOrderKey(copy);
+      itemOrderKey(
+        copy
+      );
+
 
     const limit=
       itemCartLimit(
@@ -1573,56 +2630,87 @@ async function(
         dollLimit
       );
 
+
     /*
-      找可以放這個商品的車
+      找目前還能放
+      這個商品的車
     */
 
     const choices=
       cars
-        .map((c,n)=>({
-          n,
-          c,
-          count:
-            c.items
-              .filter(
-                x=>
-                  itemOrderKey(x)===
-                  key
-              )
-              .length
-        }))
+        .map(
+          (car,n)=>({
+
+            n,
+
+            car,
+
+            count:
+              car.items
+                .filter(
+                  x=>
+                    itemOrderKey(x)===
+                    key
+                )
+                .length
+
+          })
+        )
         .filter(
-          x=>x.count<limit
+          x=>
+
+            !Number.isFinite(
+              limit
+            )||
+
+            x.count<
+              limit
         );
+
 
     let to;
 
 
     /*
-      如果目前這一車還能放
-      優先放原車
+      原車還能放
+      優先原車
     */
 
-    if(choices.length){
+    if(
+      choices.length
+    ){
 
-      choices.sort((a,b)=>{
+      choices.sort(
+        (a,b)=>{
 
-        if(
-          a.n===from&&
-          b.n!==from
-        )return-1;
+          if(
+            a.n===from&&
+            b.n!==from
+          ){
 
-        if(
-          b.n===from&&
-          a.n!==from
-        )return 1;
+            return -1;
 
-        return(
-          a.c.total-
-          b.c.total
-        );
+          }
 
-      });
+
+          if(
+            b.n===from&&
+            a.n!==from
+          ){
+
+            return 1;
+
+          }
+
+
+          return(
+            a.car.total-
+            b.car.total
+          );
+
+        }
+      );
+
 
       to=
         choices[0].n;
@@ -1631,21 +2719,31 @@ async function(
 
 
     /*
-      所有車都到限購上限
-      自動新增一車
+      所有車都達限購
+      → 新開一車
     */
 
-    if(to===undefined){
+    if(
+      to===undefined
+    ){
 
       const newCar={
-        items:[copy],
+
+        items:[
+          copy
+        ],
+
         total:0,
+
         counts:{}
+
       };
+
 
       recalcCar(
         newCar
       );
+
 
       cars.push(
         newCar
@@ -1655,7 +2753,10 @@ async function(
 
       cars[to]
         .items
-        .push(copy);
+        .push(
+          copy
+        );
+
 
       recalcCar(
         cars[to]
@@ -1666,45 +2767,67 @@ async function(
 
     save();
 
+
     renderCars();
 
   }
 
 
-  /* =========================
-     刪除多訂品
-  ========================= */
+/* =========================
+   刪除多訂
+========================= */
 
   function removeExtra(
     item,
     carIndex
   ){
 
-    if(!item.__extra)return;
+    if(
+      !item.__extra
+    ){
 
-    const c=
-      cars[carIndex];
+      return;
 
-    if(!c)return;
+    }
+
+
+    const car=
+      cars[
+        carIndex
+      ];
+
+
+    if(!car){
+      return;
+    }
+
 
     const idx=
-      c.items
-        .indexOf(item);
+      car.items
+        .indexOf(
+          item
+        );
 
-    if(idx<0)return;
 
-    c.items.splice(
+    if(idx<0){
+      return;
+    }
+
+
+    car.items.splice(
       idx,
       1
     );
 
 
     /*
-      刪掉後整車空了
-      自動刪除這車
+      整車空了
+      → 刪掉這車
     */
 
-    if(!c.items.length){
+    if(
+      !car.items.length
+    ){
 
       cars.splice(
         carIndex,
@@ -1713,21 +2836,24 @@ async function(
 
     }else{
 
-      recalcCar(c);
+      recalcCar(
+        car
+      );
 
     }
 
 
     save();
 
+
     renderCars();
 
   }
 
 
-  /* =========================
-     商品拖曳
-  ========================= */
+/* =========================
+   商品拖曳
+========================= */
 
   function makeDraggable(
     el,
@@ -1735,10 +2861,16 @@ async function(
     carIndex
   ){
 
-    el.draggable=true;
+    el.draggable=
+      true;
 
-    el.__orderItem=item;
-    el.__carIndex=carIndex;
+
+    el.__orderItem=
+      item;
+
+
+    el.__carIndex=
+      carIndex;
 
 
     el.addEventListener(
@@ -1746,8 +2878,8 @@ async function(
       e=>{
 
         /*
-          按複製或刪除鈕
-          不啟動拖曳
+          點 ＋1 或 ×
+          不開始拖曳
         */
 
         if(
@@ -1755,15 +2887,23 @@ async function(
             ".plan-copy-btn,.plan-remove-btn"
           )
         ){
+
           e.preventDefault();
+
           return;
+
         }
 
 
         dragging={
+
           el,
+
           item,
-          from:el.__carIndex
+
+          from:
+            el.__carIndex
+
         };
 
 
@@ -1782,7 +2922,9 @@ async function(
           e.dataTransfer
             .setData(
               "text/plain",
-              itemOrderKey(item)
+              itemOrderKey(
+                item
+              )
             );
 
         }catch{}
@@ -1795,10 +2937,9 @@ async function(
       "dragend",
       ()=>{
 
-        el.classList
-          .remove(
-            "dragging"
-          );
+        el.classList.remove(
+          "dragging"
+        );
 
 
         target
@@ -1807,10 +2948,9 @@ async function(
           )
           .forEach(
             x=>
-              x.classList
-                .remove(
-                  "drag-over"
-                )
+              x.classList.remove(
+                "drag-over"
+              )
           );
 
 
@@ -1822,9 +2962,9 @@ async function(
   }
 
 
-  /* =========================
-     移動到既有車
-  ========================= */
+/* =========================
+   拖到其他車
+========================= */
 
   function moveToCar(
     from,
@@ -1832,11 +2972,19 @@ async function(
     item
   ){
 
-    if(from===to)return;
+    if(
+      from===to
+    ){
+
+      return;
+
+    }
 
 
     const key=
-      itemOrderKey(item);
+      itemOrderKey(
+        item
+      );
 
 
     const limit=
@@ -1858,7 +3006,9 @@ async function(
 
 
     if(
-      Number.isFinite(limit)&&
+      Number.isFinite(
+        limit
+      )&&
       current>=limit
     ){
 
@@ -1874,10 +3024,14 @@ async function(
     const idx=
       cars[from]
         .items
-        .indexOf(item);
+        .indexOf(
+          item
+        );
 
 
-    if(idx<0)return;
+    if(idx<0){
+      return;
+    }
 
 
     cars[from]
@@ -1890,12 +3044,15 @@ async function(
 
     cars[to]
       .items
-      .push(item);
+      .push(
+        item
+      );
 
 
     recalcCar(
       cars[from]
     );
+
 
     recalcCar(
       cars[to]
@@ -1903,7 +3060,8 @@ async function(
 
 
     /*
-      原本那車被搬空
+      原車搬空
+      → 刪掉
     */
 
     if(
@@ -1922,14 +3080,15 @@ async function(
 
     save();
 
+
     renderCars();
 
   }
 
 
-  /* =========================
-     拖到底部新增一車
-  ========================= */
+/* =========================
+   拖到底部新增一車
+========================= */
 
   function addNewCar(
     from,
@@ -1939,10 +3098,14 @@ async function(
     const idx=
       cars[from]
         ?.items
-        .indexOf(item);
+        .indexOf(
+          item
+        );
 
 
-    if(idx<0)return;
+    if(idx<0){
+      return;
+    }
 
 
     cars[from]
@@ -1959,9 +3122,15 @@ async function(
 
 
     const newCar={
-      items:[item],
+
+      items:[
+        item
+      ],
+
       total:0,
+
       counts:{}
+
     };
 
 
@@ -1991,14 +3160,15 @@ async function(
 
     save();
 
+
     renderCars();
 
   }
 
 
-  /* =========================
-     建立一車畫面
-  ========================= */
+/* =========================
+   畫一車
+========================= */
 
   function createCarRow(
     car,
@@ -2006,17 +3176,17 @@ async function(
   ){
 
     const row=
-      document
-        .createElement(
-          "div"
-        );
+      document.createElement(
+        "div"
+      );
 
 
     row.className=
       "auto-order-row";
 
 
-    row.dataset.car=n;
+    row.dataset.car=
+      n;
 
 
     const ok=
@@ -2069,8 +3239,7 @@ async function(
 
       </div>
 
-      <button
-        class="auto-order-add">
+      <button class="auto-order-add">
         ＋
       </button>
 
@@ -2083,18 +3252,20 @@ async function(
       );
 
 
-    car.items
-      .forEach(i=>{
+    car.items.forEach(
+      i=>{
 
         const el=
           card(i);
 
 
         /*
-          多訂品
+          多訂卡
         */
 
-        if(i.__extra){
+        if(
+          i.__extra
+        ){
 
           el.classList.add(
             "plan-extra"
@@ -2102,10 +3273,9 @@ async function(
 
 
           const label=
-            document
-              .createElement(
-                "div"
-              );
+            document.createElement(
+              "div"
+            );
 
 
           label.className=
@@ -2124,14 +3294,13 @@ async function(
 
 
         /*
-          ＋1 複製按鈕
+          ＋1
         */
 
         const copy=
-          document
-            .createElement(
-              "button"
-            );
+          document.createElement(
+            "button"
+          );
 
 
         copy.className=
@@ -2149,7 +3318,9 @@ async function(
         copy.onmousedown=
         copy.ontouchstart=
           e=>{
+
             e.stopPropagation();
+
           };
 
 
@@ -2157,6 +3328,7 @@ async function(
           e=>{
 
             e.stopPropagation();
+
 
             duplicateItem(
               i,
@@ -2172,16 +3344,17 @@ async function(
 
 
         /*
-          多訂品才有刪除鈕
+          多訂卡刪除鈕
         */
 
-        if(i.__extra){
+        if(
+          i.__extra
+        ){
 
           const del=
-            document
-              .createElement(
-                "button"
-              );
+            document.createElement(
+              "button"
+            );
 
 
           del.className=
@@ -2199,7 +3372,9 @@ async function(
           del.onmousedown=
           del.ontouchstart=
             e=>{
+
               e.stopPropagation();
+
             };
 
 
@@ -2207,6 +3382,7 @@ async function(
             e=>{
 
               e.stopPropagation();
+
 
               removeExtra(
                 i,
@@ -2234,12 +3410,13 @@ async function(
           el
         );
 
-      });
+      }
+    );
 
 
-    /* =========================
-       拖進這車
-    ========================= */
+    /*
+      拖進這車
+    */
 
     grid.addEventListener(
       "dragover",
@@ -2253,10 +3430,9 @@ async function(
           dragging.from!==n
         ){
 
-          grid.classList
-            .add(
-              "drag-over"
-            );
+          grid.classList.add(
+            "drag-over"
+          );
 
 
           e.dataTransfer
@@ -2279,10 +3455,9 @@ async function(
           )
         ){
 
-          grid.classList
-            .remove(
-              "drag-over"
-            );
+          grid.classList.remove(
+            "drag-over"
+          );
 
         }
 
@@ -2297,25 +3472,30 @@ async function(
         e.preventDefault();
 
 
-        grid.classList
-          .remove(
-            "drag-over"
-          );
+        grid.classList.remove(
+          "drag-over"
+        );
 
 
         if(
           !dragging||
           dragging.from===n
-        )return;
+        ){
+
+          return;
+
+        }
 
 
         const {
           from,
           item
-        }=dragging;
+        }=
+          dragging;
 
 
-        dragging=null;
+        dragging=
+          null;
 
 
         moveToCar(
@@ -2329,7 +3509,7 @@ async function(
 
 
     /*
-      右側 ＋
+      右邊 ＋
       整車加入購物車
     */
 
@@ -2350,17 +3530,16 @@ async function(
   }
 
 
-  /* =========================
-     最下面新增一車區
-  ========================= */
+/* =========================
+   最下面新增車
+========================= */
 
   function createManualDrop(){
 
     const drop=
-      document
-        .createElement(
-          "div"
-        );
+      document.createElement(
+        "div"
+      );
 
 
     drop.className=
@@ -2378,12 +3557,13 @@ async function(
         e.preventDefault();
 
 
-        if(dragging){
+        if(
+          dragging
+        ){
 
-          drop.classList
-            .add(
-              "drag-over"
-            );
+          drop.classList.add(
+            "drag-over"
+          );
 
 
           e.dataTransfer
@@ -2406,10 +3586,9 @@ async function(
           )
         ){
 
-          drop.classList
-            .remove(
-              "drag-over"
-            );
+          drop.classList.remove(
+            "drag-over"
+          );
 
         }
 
@@ -2424,22 +3603,29 @@ async function(
         e.preventDefault();
 
 
-        drop.classList
-          .remove(
-            "drag-over"
-          );
+        drop.classList.remove(
+          "drag-over"
+        );
 
 
-        if(!dragging)return;
+        if(
+          !dragging
+        ){
+
+          return;
+
+        }
 
 
         const {
           from,
           item
-        }=dragging;
+        }=
+          dragging;
 
 
-        dragging=null;
+        dragging=
+          null;
 
 
         addNewCar(
@@ -2456,9 +3642,9 @@ async function(
   }
 
 
-  /* =========================
-     重新畫全部車
-  ========================= */
+/* =========================
+   重畫全部車
+========================= */
 
   function renderCars(){
 
@@ -2494,6 +3680,7 @@ async function(
   renderCars();
 
 };
+
 </script>
 </body>
 </html>

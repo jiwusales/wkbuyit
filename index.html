@@ -950,13 +950,15 @@ el.addEventListener("touchstart",start,{passive:false});
 if("scrollRestoration" in history)history.scrollRestoration="manual";
 
 window.onload=async()=>{
-window.scrollTo(0,0);
-renderTabs();
-await loadShippingSettings();
-updateCartUI();
-await switchTab(currentTab);
-window.scrollTo(0,0);
+  window.scrollTo(0,0);
+  renderTabs();
+  await loadShippingSettings();
+  updateCartUI();
+  await switchTab(currentTab);
+  window.scrollTo(0,0);
 };
+</script>
+
 <script>
 const PLAN_API="https://script.google.com/macros/s/AKfycbwCmtwlK88B8yK2imEUWub_ERY6FLMO0KbYFhfFW64ai5g4NLhizcKQRkUwjWYjvtZQlA/exec";
 let remotePlanCache={},planSaveTimers={};

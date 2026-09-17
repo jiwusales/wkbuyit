@@ -203,6 +203,30 @@ function findCol(headers,exact=[],partial=[]){
   return headers.findIndex(h=>p.some(x=>norm(h).includes(x)));
 }
 
+function findCols(headers,exact=[],partial=[]){
+  const ex=exact.map(norm),pa=partial.map(norm),out=[];
+  headers.forEach((h,i)=>{
+    const n=norm(h);
+    if(ex.includes(n)||pa.some(x=>n.includes(x)))out.push(i);
+  });
+  return [...new Set(out)];
+}
+
+function getAnyV(r,indexes){
+  for(const i of indexes){
+    if(i<0||!r.c||!r.c[i])continue;
+    const c=r.c[i];
+    let v=c.v;
+    if((v===null||v===undefined||String(v).trim()==="")&&c.f!==null&&c.f!==undefined)v=c.f;
+    v=String(v??"").trim();
+    if(v!=="")return v;
+  }
+  return"";
+}
+
+function hasSn(i){return String(i?.sn??"").trim()!==""}
+function hasUrl(i){return String(i?.url??"").trim()!==""}
+
 async function getSheet(sheet,force=false){
   if(!force&&sheetCache[sheet])return sheetCache[sheet];
 
@@ -218,7 +242,7 @@ async function getSheet(sheet,force=false){
     name:findCol(L,["名稱","商品名稱","品名"]),
     originalPrice:findCol(L,["原價","商品原價","日幣原價"]),
     stock:findCol(L,["庫存"]),
-    sn:findCol(L,["貨號","商品貨號","商品編號","品番","SKU","sku"],["貨號","SKU","品番"]),
+    sn:findCols(L,["貨號","商品貨號","商品編號","品番","SKU","sku"],["貨號","SKU","品番"]),
     img:findCol(L,["圖片","首圖","圖片網址"]),
     url:findCol(L,["商品網址","網址","URL","url","商品URL"],["商品網址","URL"]),
     status:findCol(L,["狀態"]),
@@ -234,7 +258,7 @@ async function getSheet(sheet,force=false){
     name:getV(r,C.name),
     originalPrice:getV(r,C.originalPrice),
     colStock:getV(r,C.stock),
-    sn:getV(r,C.sn),
+    sn:getAnyV(r,C.sn),
     img:getV(r,C.img),
     url:getV(r,C.url),
     status:getV(r,C.status),
@@ -253,17 +277,15 @@ async function loadOrderedCounts(){
   const d=JSON.parse(t.substr(47).slice(0,-2));
   const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
 
-  const S=findCol(L,["貨號","商品貨號","SKU"],["貨號","SKU"]);
+  const S=findCols(L,["貨號","商品貨號","SKU"],["貨號","SKU"]);
   const N=findCol(L,["名稱","商品名稱","品名"]);
   const Q=findCol(L,["數量"]);
   const O=findCol(L,["缺貨"]);
-
   const ok={},bad={};
 
   (d.table.rows||[]).forEach(r=>{
-    const sn=getV(r,S),name=getV(r,N);
+    const sn=getAnyV(r,S),name=getV(r,N);
     if(!sn&&!name)return;
-
     const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
     ok[key]=(ok[key]||0)+(Number(getV(r,Q))||0);
     bad[key]=(bad[key]||0)+(Number(getV(r,O))||0);
@@ -276,45 +298,30 @@ async function loadOrderedCounts(){
 function productUrlKey(v){
   try{
     const u=new URL(String(v||"").trim());
-
-    // 不比較 ?variant=xxx 之類 query
-    // 避免同一商品網址因參數不同而比對失敗
     return u.hostname.replace(/^www\./,"").toLowerCase()+u.pathname.replace(/\/+$/,"");
-  }catch{
-    return norm(v);
-  }
+  }catch{return norm(v)}
 }
 
 function findStock(item,stock){
-  const sn=norm(item.sn);
+  const sn=String(item.sn??"").trim();
 
-  // ① 貨號完全相同
   if(sn){
-    const s=stock.find(x=>norm(x.sn)===sn);
+    const s=stock.find(x=>String(x.sn??"").trim()===sn);
     if(s)return s;
   }
 
-  // ② 商品網址相同
-  // もぐもぐ本舖如果線上銷售暫時沒抓到貨號，可從商品庫存／最新開團補
   const url=productUrlKey(item.url);
   if(url){
     const s=stock.find(x=>productUrlKey(x.url)===url);
     if(s)return s;
   }
 
-  // ③ 名稱＋角色
   const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`);
-
-  return stock.find(x=>
-    (norm(x.name)===name&&norm(x.role)===role)||
-    norm(`${x.name}${x.role}`)===full||
-    norm(`${x.role}${x.name}`)===full
-  )||null;
+  return stock.find(x=>(norm(x.name)===name&&norm(x.role)===role)||norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full)||null;
 }
 
 function mergeStock(item,stock){
   const s=findStock(item,stock);
-
   return{
     ...item,
     ip:item.ip||s?.ip||"",
@@ -322,18 +329,17 @@ function mergeStock(item,stock){
     type:item.type||s?.type||"",
     img:s?.img||item.img||"",
     url:item.url||s?.url||"",
-    sn:item.sn||s?.sn||"",
+    sn:hasSn(item)?String(item.sn).trim():(s?.sn??""),
     originalPrice:s?.originalPrice||item.originalPrice||""
   };
 }
 
 function mergeLatestPrice(item,latest){
   const s=findStock(item,latest);
-
   return{
     ...item,
     img:s?.img||item.img||"",
-    sn:item.sn||s?.sn||"",
+    sn:hasSn(item)?String(item.sn).trim():(s?.sn??""),
     url:item.url||s?.url||"",
     originalPrice:s?.originalPrice||item.originalPrice||""
   };
@@ -346,20 +352,15 @@ async function getProductImage(url){
   if(imageCache[url]!==undefined)return imageCache[url];
 
   try{
-    const u=new URL(url);
-    const m=u.pathname.match(/\/products\/([^/?#]+)/);
+    const u=new URL(url),m=u.pathname.match(/\/products\/([^/?#]+)/);
 
     if(m){
       try{
         const r=await fetch(`${u.origin}/products/${m[1]}.js`);
-
         if(r.ok){
           const p=await r.json();
           const img=p.featured_image||p.images?.[0]||"";
-
-          if(img){
-            return imageCache[url]=String(img).replace(/^\/\//,"https://");
-          }
+          if(img)return imageCache[url]=String(img).replace(/^\/\//,"https://");
         }
       }catch{}
     }
@@ -369,62 +370,30 @@ async function getProductImage(url){
 
     const html=await r.text();
     const d=new DOMParser().parseFromString(html,"text/html");
-
-    const img=
-      d.querySelector('meta[property="og:image:secure_url"]')?.content||
+    const img=d.querySelector('meta[property="og:image:secure_url"]')?.content||
       d.querySelector('meta[property="og:image"]')?.content||
-      d.querySelector('meta[name="twitter:image"]')?.content||
-      "";
+      d.querySelector('meta[name="twitter:image"]')?.content||"";
 
     return imageCache[url]=img?new URL(img,url).href:"";
-
-  }catch{
-    return imageCache[url]="";
-  }
+  }catch{return imageCache[url]=""}
 }
 
 async function fillMissingImages(rows){
-  await Promise.all(rows.map(async i=>{
-    if(!i.img&&i.url)i.img=await getProductImage(i.url);
-  }));
-
+  await Promise.all(rows.map(async i=>{if(!i.img&&i.url)i.img=await getProductImage(i.url)}));
   return rows;
 }
 
 function filterNormal(rows,key){
   const ok=i=>["0","1"].includes(i.colStock);
-
-  if(key==="chiikawa"){
-    return rows.filter(i=>
-      i.name&&
-      ok(i)&&
-      ["ちいかわ","ちいかわ樂園"].includes(i.ip)&&
-      originOf(i.url)===SITES.chiikawa
-    );
-  }
-
-  if(key==="nagano"){
-    return rows.filter(i=>
-      i.name&&
-      ok(i)&&
-      i.ip==="ナガノ"&&
-      originOf(i.url)===SITES.nagano
-    );
-  }
-
-  return rows.filter(i=>
-    i.name&&
-    ok(i)&&
-    i.ip==="ちいかわ"&&
-    originOf(i.url)===SITES.mogu
-  );
+  if(key==="chiikawa")return rows.filter(i=>i.name&&ok(i)&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
+  if(key==="nagano")return rows.filter(i=>i.name&&ok(i)&&i.ip==="ナガノ"&&originOf(i.url)===SITES.nagano);
+  return rows.filter(i=>i.name&&ok(i)&&i.ip==="ちいかわ"&&originOf(i.url)===SITES.mogu);
 }
 
 async function switchTab(key){
   currentTab=key;
   selectedTypes=[];
   selectedRole=null;
-
   localStorage.setItem("jiwu_helper_tab",key);
   window.scrollTo(0,0);
 
@@ -436,13 +405,10 @@ async function switchTab(key){
   document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
   try{
-    // 線上銷售每次重新抓最新資料
     let rows=await getSheet(TABS[key].sheet,true),stock;
-
     await loadOrderedCounts();
 
     if(key==="pending"){
-      // 商品庫存也強制重新抓，避免剛回填貨號卻仍用舊快取
       stock=await getSheet("商品庫存",true);
 
       rows=rows
@@ -450,7 +416,6 @@ async function switchTab(key){
         .map(i=>mergeStock(i,stock));
 
       const groupSite={};
-
       rows.forEach(i=>{
         const o=originOf(i.url);
         if(i.group&&ALLOWED.includes(o))groupSite[norm(i.group)]=o;
@@ -461,7 +426,6 @@ async function switchTab(key){
         .map(i=>({...i,_siteOrigin:originOf(i.url)||groupSite[norm(i.group)]||""}));
 
     }else if(key==="latest"||key==="reminder"){
-      // 兩邊都重新抓，不使用舊 cache
       stock=await getSheet("商品庫存",true);
       const latest=await getSheet("最新開團",true);
 
@@ -471,31 +435,18 @@ async function switchTab(key){
         .map(i=>mergeLatestPrice(i,latest));
 
       /*
-        同一團只要任一商品已經同時有：
-        1. 團名
-        2. 貨號
-        3. 商品網址
-
-        整團就進「開團待訂區」
+        貨號完全不驗證格式：
+        123 / ABC / CHGS-123 / A1 都算有貨號。
+        同團只要任一商品有「貨號＋網址」，整團進開團待訂區。
       */
       const latestGroups=new Set(
-        rows
-          .filter(i=>norm(i.group)&&norm(i.sn)&&String(i.url||"").trim())
-          .map(i=>norm(i.group))
+        rows.filter(i=>norm(i.group)&&hasSn(i)&&hasUrl(i)).map(i=>norm(i.group))
       );
 
       if(key==="latest"){
-        rows=rows.filter(i=>
-          i.group
-            ?latestGroups.has(norm(i.group))
-            :norm(i.sn)&&String(i.url||"").trim()
-        );
+        rows=rows.filter(i=>i.group?latestGroups.has(norm(i.group)):hasSn(i)&&hasUrl(i));
       }else{
-        rows=rows.filter(i=>
-          i.group
-            ?!latestGroups.has(norm(i.group))
-            :!norm(i.sn)||!String(i.url||"").trim()
-        );
+        rows=rows.filter(i=>i.group?!latestGroups.has(norm(i.group)):!hasSn(i)||!hasUrl(i));
       }
 
     }else{
@@ -518,18 +469,13 @@ async function switchTab(key){
     allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
 
     renderRoleNav();
-
-    if(["pending","latest","reminder"].includes(key)){
-      document.getElementById("filter-bar").innerHTML="";
-    }else{
-      renderFilters();
-    }
+    if(["pending","latest","reminder"].includes(key))document.getElementById("filter-bar").innerHTML="";
+    else renderFilters();
 
     renderItems();
 
     requestAnimationFrame(()=>{
-      document.getElementById("card-container").style.paddingTop=
-        40+document.querySelector(".header-fixed").offsetHeight+"px";
+      document.getElementById("card-container").style.paddingTop=40+document.querySelector(".header-fixed").offsetHeight+"px";
     });
 
   }catch(e){
@@ -785,27 +731,28 @@ box.appendChild(d);grid(a);
 }
 
 function createCard(item,status=""){
-const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
-const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${!item.sn&&!item.url?"缺貨號、商品網址":!item.sn?"缺貨號":"缺商品網址"}</div>`:"";
-const warn=normalTab()&&item.colStock==="1";
-const link=item.url?`<a class="product-link" href="${item.url}" target="_blank" onclick="event.stopPropagation()">商品頁面</a>`:"";
+  const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
+  const noSn=!hasSn(item),noUrl=!hasUrl(item);
+  const miss=rem?`<div style="font-size:9px;color:#e66;margin-bottom:5px">${noSn&&noUrl?"缺貨號、商品網址":noSn?"缺貨號":noUrl?"缺商品網址":""}</div>`:"";
+  const warn=normalTab()&&item.colStock==="1";
+  const link=item.url?`<a class="product-link" href="${item.url}" target="_blank" onclick="event.stopPropagation()">商品頁面</a>`:"";
 
-c.className="card";
-c.innerHTML=
-`${status==="ordered"?'<div class="ordered-tag">✓</div>':""}
-${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
-${warn?'<div class="stock-warning">☝🏻</div>':""}
-${(!status&&(!rem||item.url))?'<div class="add-btn-tag">＋</div>':""}
-<img src="${item.img||IMG}">
-${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
-<div class="name" title="${productText(item)}">${productText(item)}</div>
-<div class="price">${priceText(item.originalPrice)}</div>
-${link}${miss}`;
+  c.className="card";
+  c.innerHTML=
+  `${status==="ordered"?'<div class="ordered-tag">✓</div>':""}
+  ${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
+  ${warn?'<div class="stock-warning">☝🏻</div>':""}
+  ${(!status&&(!rem||item.url))?'<div class="add-btn-tag">＋</div>':""}
+  <img src="${item.img||IMG}">
+  ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
+  <div class="name" title="${productText(item)}">${productText(item)}</div>
+  <div class="price">${priceText(item.originalPrice)}</div>
+  ${link}${miss}`;
 
-const btn=c.querySelector(".add-btn-tag");
-if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
-c.onclick=()=>zoomCard(c);
-return c;
+  const btn=c.querySelector(".add-btn-tag");
+  if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
+  c.onclick=()=>zoomCard(c);
+  return c;
 }
 
 function zoomCard(c){
@@ -921,38 +868,43 @@ try{return new URL(url).hostname.replace(/^www\./,"")}catch{return""}
 }
 
 async function tryShopify(item){
-try{
-const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
-if(!m)return null;
+  try{
+    const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
+    if(!m)return null;
 
-const r=await fetch(`${u.origin}/products/${m[1]}.js`);
-if(!r.ok)return null;
+    const r=await fetch(`${u.origin}/products/${m[1]}.js`);
+    if(!r.ok)return null;
 
-const p=await r.json(),vs=p.variants||[],vid=u.searchParams.get("variant");
-let v;
+    const p=await r.json(),vs=p.variants||[],vid=u.searchParams.get("variant");
+    let v;
 
-if(vid)v=vs.find(x=>String(x.id)===String(vid));
+    // 網址本身有 variant 時優先使用
+    if(vid)v=vs.find(x=>String(x.id)===String(vid));
 
-if(!v){
-if(item.urlOnly||item.useUrl||!item.sn)
-v=vs.find(x=>x.available!==false)||vs[0];
-else
-v=vs.find(x=>String(x.sku||"").trim()===String(item.sn).trim());
-}
+    if(!v){
+      const isMogu=u.origin===SITES.mogu;
 
-if(!v?.id)return null;
+      // もぐもぐ本舖：不驗證你輸入的貨號是不是官網 SKU
+      if(isMogu||item.urlOnly||item.useUrl||!hasSn(item)){
+        v=vs.find(x=>x.available!==false)||vs[0];
+      }else{
+        v=vs.find(x=>String(x.sku||"").trim()===String(item.sn||"").trim());
+      }
+    }
 
-return{
-kind:"shopify",
-origin:u.origin,
-id:String(v.id),
-available:v.available!==false,
-item
-};
+    if(!v?.id)return null;
 
-}catch{
-return null;
-}
+    return{
+      kind:"shopify",
+      origin:u.origin,
+      id:String(v.id),
+      available:v.available!==false,
+      item
+    };
+
+  }catch{
+    return null;
+  }
 }
 
 async function tryWooCommerce(item){

@@ -36,12 +36,52 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .auto-order-ok{color:#55a36a;font-weight:bold}.auto-order-warn{color:#e78655;font-weight:bold}
 .manual-car-drop{margin:10px 0 18px 30px;min-height:65px;border:2px dashed var(--theme);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--active);font-size:12px;font-weight:bold;background:#fff;transition:.15s}
 .manual-car-drop.drag-over{background:#f8f3ff;border-color:var(--active);transform:scale(1.01)}
-.plan-copy-btn,.plan-remove-btn{position:absolute;top:3px;z-index:30;height:20px;min-width:22px;border:0;border-radius:6px;font-size:10px;font-weight:bold;cursor:pointer;padding:0 5px}
-.plan-copy-btn{left:4px;background:var(--theme);color:#fff}
-.plan-remove-btn{left:4px;background:#E24C60;color:#fff}
-.plan-extra .plan-copy-btn{left:31px}
-.plan-extra{box-shadow:inset 0 0 0 2px #E24C6055}
-.plan-extra-label{position:absolute;bottom:3px;right:3px;background:#E24C60;color:#fff;border-radius:5px;padding:2px 4px;font-size:8px;font-weight:bold;z-index:20}
+.plan-copy-btn,.plan-remove-btn{
+  position:absolute;
+  z-index:30;
+  height:20px;
+  min-width:22px;
+  border:0;
+  border-radius:6px;
+  font-size:10px;
+  font-weight:bold;
+  cursor:pointer;
+  padding:0 5px;
+}
+
+/* ＋1 放商品卡右下角 */
+.plan-copy-btn{
+  right:4px;
+  bottom:4px;
+  background:var(--theme);
+  color:#fff;
+}
+
+/* 多訂商品的刪除鈕放左上角 */
+.plan-remove-btn{
+  left:4px;
+  top:4px;
+  background:#E24C60;
+  color:#fff;
+}
+
+.plan-extra{
+  box-shadow:inset 0 0 0 2px #E24C6055;
+}
+
+/* 「多」標籤移到左下角，避免跟 ＋1 撞到 */
+.plan-extra-label{
+  position:absolute;
+  left:4px;
+  bottom:4px;
+  background:#E24C60;
+  color:#fff;
+  border-radius:5px;
+  padding:2px 4px;
+  font-size:8px;
+  font-weight:bold;
+  z-index:20;
+}
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
 .card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}

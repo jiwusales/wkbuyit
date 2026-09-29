@@ -1,68 +1,3878 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>JIWU團務進度表</title>
-<link rel="icon" href="https://cdn.jsdelivr.net/gh/jiwusales/imgh@main/images_1350/icon_9a717cff.png">
-<link rel="preconnect" href="https://script.google.com">
-<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-<link rel="preconnect" href="https://images.weserv.nl" crossorigin>
-<link rel="dns-prefetch" href="//images.weserv.nl">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>吉物敗家小幫手</title>
+<link rel="icon" href="https://i.postimg.cc/3R7nNT0k/icon.png" type="image/png">
 <style>
-:root{color-scheme:light;--ink:#344b3c;--muted:#777;--paper:#fafafb;--line:#e1e5ed;--soft:#ededee;--active:#9e8268}
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",Arial,sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}.shell{max-width:none;margin:auto;padding:0 32px 48px}.siteHeader{height:72px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);background:#fff;padding:0 32px;margin:0 calc(32px * -1) 22px}.siteTitle{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:800;color:#444}.siteTitle img{width:34px;height:34px;object-fit:contain}.save{border:0;border-radius:9px;background:var(--active);color:#fff;font-weight:800;padding:9px 15px;letter-spacing:.05em}.save[disabled]{opacity:.5}.filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:15px}.filter,.status{border:0;border-radius:9px;background:var(--soft);color:#64666a;font-weight:700;padding:9px 14px;min-width:70px}.filter[aria-selected="true"],.status.selected{background:var(--active);color:#fff}.hint{font-size:13px;color:#73786a;margin:0 0 20px}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px}.tile{overflow:hidden;border:1px solid var(--line);border-radius:13px;background:#fff;color:var(--ink);padding:0;text-align:center;touch-action:manipulation}.tile.dragging{opacity:.5;outline:2px dashed var(--active);outline-offset:3px}.tile img,.blank{display:block;width:100%;aspect-ratio:1080/400;object-fit:cover;background:#eef1f7}.tile strong{display:block;min-height:44px;padding:9px 7px 3px;font-size:12px;line-height:1.35;overflow:hidden}.tile small{display:block;min-height:29px;padding:0 7px 9px;color:#7d746d;font-size:12px}.complete{margin:36px 0 18px;padding-top:22px;border-top:1px solid var(--line);color:var(--active);font-size:18px}.empty,.loading{padding:42px 0;text-align:center;color:var(--muted)}.login{position:fixed;inset:0;display:grid;place-items:center;background:#f4f1ec;z-index:10}.loginCard{width:min(360px,calc(100% - 32px));padding:30px;border-radius:18px;background:#fff;box-shadow:0 10px 30px #372e2520}.loginCard img{display:block;width:130px;margin:0 auto 16px}.loginCard input,.edit input,.edit textarea{width:100%;margin:10px 0;border:1px solid #ccd1d8;border-radius:9px;padding:10px;background:#fff}.loginCard label{font-size:13px;color:#666}.loginCard .save{width:100%;margin-top:14px}.error{min-height:20px;color:#c34b4b;font-size:13px}.dialog{width:min(620px,calc(100% - 28px));border:0;border-radius:18px;padding:24px;box-shadow:0 16px 50px #0004}.dialog::backdrop{background:#0006}.dialogHead{display:flex;align-items:center;justify-content:space-between;gap:12px}.dialogHead h2{margin:0;font-size:20px;color:#111}.light{border:0;border-radius:8px;background:#ededee;color:#666;padding:8px 12px;font-weight:700}.statuses{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin:18px 0}.status{min-width:0;padding:8px 3px;font-size:13px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}.edit label{display:block;font-weight:700;font-size:14px}.edit textarea{resize:vertical;min-height:96px}.notice{position:fixed;right:20px;bottom:20px;border-radius:10px;background:#344b3c;color:#fff;padding:10px 14px;box-shadow:0 6px 18px #0002;opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s}.notice.show{opacity:1;transform:none}@media(max-width:650px){.shell{padding:0 14px 36px}.siteHeader{height:60px;padding:0 14px;margin:0 -14px 16px}.siteTitle{font-size:18px}.siteTitle img{width:28px;height:28px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.filters{gap:6px}.filter{min-width:0;padding:8px 11px;font-size:13px}.statuses{grid-template-columns:repeat(4,minmax(0,1fr));}.pair{grid-template-columns:1fr}.dialog{padding:18px}.hint{line-height:1.5}}
-</style>
-<style>
-.siteTitle{font-family:"Hiragino Maru Gothic ProN","Arial Rounded MT Bold","Hiragino Sans",sans-serif;font-weight:400}
-.tile strong{display:flex;align-items:flex-end;justify-content:center;text-align:center}
-.loading{grid-column:1/-1;width:100%;text-align:center}
-.filters .filter{flex:1 1 120px;min-width:0}
-.syncInfo{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-height:24px;margin:-5px 0 12px;color:#888;font-size:12px}.syncInfo button{border:0;background:transparent;color:#9e8268;padding:4px;cursor:pointer}.skeleton{height:180px;border:1px solid var(--line);border-radius:13px;background:linear-gradient(#eef1f7 0 60%,#fff 60%);}.skeleton:after{content:"";display:block;margin:125px auto 0;width:65%;height:12px;border-radius:6px;background:#eee}
+:root{--theme:#D9C0FA;--active:#8A6FA8;--text:#333}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);text-align:center;overflow-x:hidden}
+.top-bar{position:fixed;top:0;left:0;width:100%;height:40px;background:var(--theme);color:#fff;z-index:999;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:bold}
+.header-fixed{position:fixed;top:40px;width:100%;background:#fff;z-index:998;border-bottom:1px solid #eee}
+.page-tabs-wrapper,.nav-bar-wrapper,.filter-bar-wrapper{display:flex;align-items:center;padding:0 5px}
+.page-tabs-wrapper{height:40px;border-bottom:1px solid #eee}.nav-bar-wrapper{height:38px;border-bottom:1px solid #eee}.filter-bar-wrapper{height:30px}
+.scroll-container{flex:1;overflow-x:auto;white-space:nowrap;scrollbar-width:none}.scroll-container::-webkit-scrollbar{display:none}
+.page-tabs{display:inline-flex;gap:5px;padding:4px 0}.page-tab{border:0;background:#f3f3f3;color:#666;padding:7px 12px;border-radius:8px;font-size:12px;white-space:nowrap;cursor:pointer}.page-tab.active{background:var(--theme);color:#fff;font-weight:bold}
+.nav-bar{display:inline-block;padding:8px 0;font-size:10pt}.nav-bar a{color:var(--text);text-decoration:none;padding:6px 0;display:inline-block;cursor:pointer}
+.nav-bar a.active-role,.filter-item.active{font-weight:bold;color:var(--active)}.nav-bar a::after{content:"｜";color:#aaa;margin:0 2px}.nav-bar a:last-child::after{content:""}
+.filter-item{display:inline-flex;align-items:center;margin:0 4px;font-size:12px;color:#666}.filter-item input{margin-right:3px;accent-color:var(--theme);transform:scale(.8)}
+.nav-arrow{width:24px;font-size:16px;cursor:pointer;flex-shrink:0;color:#bbb}
+#card-container{padding:158px 10px 10px}.type-divider{display:flex;align-items:center;justify-content:center;margin:15px 0 8px;font-weight:bold;font-size:16px}
+.type-divider::before,.type-divider::after{content:"";flex:1;border-top:1px solid #ddd;margin:0 10px}
+.category-add-all{background:#fff;border:1px solid var(--theme);color:var(--active);border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer;margin-left:6px}
+.order-limit-input{width:42px;height:24px;margin-left:6px;border:1px solid var(--theme);border-radius:6px;padding:2px 4px;font-size:10px;text-align:center;color:#555;background:#fff}
+.order-limit-confirm{height:24px;margin-left:4px;border:0;border-radius:6px;padding:0 8px;background:var(--theme);color:#fff;font-size:10px;font-weight:bold;cursor:pointer}
+.auto-order-wrap{margin:0 0 12px}
+.auto-order-row{display:flex;align-items:flex-start;gap:6px;margin:7px 0}
+.auto-order-no{width:24px;min-width:24px;padding-top:52px;font-size:18px;font-weight:bold;color:#666;line-height:1;text-align:center}
+.auto-order-main{flex:1;min-width:0}
+.auto-order-meta{display:flex;align-items:center;gap:8px;margin:0 0 4px 2px;font-size:10px;color:#777}
+.auto-order-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+@media(min-width:480px){.auto-order-grid{grid-template-columns:repeat(auto-fill,120px)}}
+.auto-order-grid.drag-over{outline:2px dashed var(--active);outline-offset:3px;border-radius:8px;background:#f8f3ff}
+.auto-order-grid .card{cursor:grab}.auto-order-grid .card:active{cursor:grabbing}.auto-order-grid .card.dragging{opacity:.35}
+.auto-order-add{width:30px;min-width:30px;height:30px;border:0;border-radius:8px;background:var(--theme);color:#fff;font-size:17px;font-weight:bold;cursor:pointer;margin-top:50px}
+.auto-order-ok{color:#55a36a;font-weight:bold}.auto-order-warn{color:#e78655;font-weight:bold}
+.manual-car-drop{margin:10px 0 18px 30px;min-height:65px;border:2px dashed var(--theme);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--active);font-size:12px;font-weight:bold;background:#fff;transition:.15s}
+.manual-car-drop.drag-over{background:#f8f3ff;border-color:var(--active);transform:scale(1.01)}
+.plan-copy-btn,.plan-remove-btn{
+  position:absolute;
+  z-index:30;
+  height:20px;
+  min-width:22px;
+  border:0;
+  border-radius:6px;
+  font-size:10px;
+  font-weight:bold;
+  cursor:pointer;
+  padding:0 5px;
+}
+
+/* ＋1 放商品卡右下角 */
+.plan-copy-btn{
+  right:4px;
+  bottom:4px;
+  background:var(--theme);
+  color:#fff;
+}
+
+/* 多訂商品的刪除鈕放左上角 */
+.plan-remove-btn{
+  left:4px;
+  top:4px;
+  background:#E24C60;
+  color:#fff;
+}
+
+.plan-extra{
+  box-shadow:inset 0 0 0 2px #E24C6055;
+}
+
+/* 「多」標籤移到左下角，避免跟 ＋1 撞到 */
+.plan-extra-label{
+  position:absolute;
+  left:4px;
+  bottom:4px;
+  background:#E24C60;
+  color:#fff;
+  border-radius:5px;
+  padding:2px 4px;
+  font-size:8px;
+  font-weight:bold;
+  z-index:20;
+}
+.group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
+.card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
+.add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
+.stock-warning{position:absolute;top:3px;left:4px;font-size:15px;line-height:18px;z-index:10}
+.ordered-tag{position:absolute;top:3px;left:5px;color:#E24C60;font-size:18px;font-weight:bold;line-height:1;z-index:10}
+.soldout-tag{position:absolute;top:3px;left:4px;font-size:15px;line-height:1;z-index:10}
+.card img{height:90px;width:auto;max-width:90%;display:block;margin:5px auto 0;object-fit:contain;pointer-events:none}
+.card .buyer{margin:2px 2px 0;font-size:9px;font-weight:bold;line-height:1.2;color:#989FC0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .name{margin:1px 2px;font-size:9px;font-weight:bold;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .price{font-size:10px;margin:1px auto 5px;color:#F68450}
+.product-link{display:inline-block;margin:0 auto 5px;padding:3px 8px;border:1px solid var(--theme);border-radius:6px;color:var(--active);font-size:9px;text-decoration:none;background:#fff}
+.card-overlay{position:fixed;inset:0;background:#000b;z-index:10000;display:flex;justify-content:center;align-items:center}.card-overlay .card{transform:scale(3.1);width:100px;padding:15px 0 5px;pointer-events:none}
+#cart-overlay-bg{position:fixed;inset:0;background:#0006;display:none;z-index:1000}
+#cart-trigger{position:fixed;top:155px;right:15px;width:45px;height:45px;background:#fff;border-radius:50%;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 8px #0003;z-index:999;opacity:.85;cursor:move;touch-action:none}
+#cart-trigger img{width:28px;height:28px;pointer-events:none}#cart-badge{position:absolute;top:-2px;right:-2px;background:#ff4d4f;color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:bold}
+#cart-panel{position:fixed;top:0;right:-300px;width:280px;height:100%;background:#fff;box-shadow:-5px 0 15px #0002;z-index:1001;transition:.3s;display:flex;flex-direction:column}#cart-panel.open{right:0}
+.cart-header{padding:12px 15px;background:var(--theme);color:#fff;font-weight:bold;font-size:16px;text-align:left;display:flex;justify-content:space-between}
+.cart-list{flex:1;overflow-y:auto;padding:10px;text-align:left}.cart-item{display:flex;align-items:center;gap:10px;margin-bottom:10px;border-bottom:1px solid #eee;padding-bottom:8px;font-size:12px}
+.cart-item img{width:45px;height:45px;object-fit:contain}.cart-item-info{flex:1;min-width:0}.cart-footer{padding:15px 15px 25px;border-top:1px solid #eee;background:#fafafa}
+.shipping-box{font-size:12px;text-align:left;background:#fff;border:1px solid #eee;border-radius:7px;padding:8px;margin-bottom:10px;line-height:1.8}
+.text-clear{display:block;text-align:left;color:#aaa;font-size:13px;text-decoration:underline;cursor:pointer;margin-bottom:10px}
+.btn-checkout{background:var(--theme);color:#fff;border:0;padding:12px;width:100%;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px}
+#checkout-modal{position:fixed;inset:0;background:#000c;z-index:2000;display:none;align-items:center;justify-content:center}.modal-content{background:#fff;width:85%;max-width:380px;border-radius:15px;padding:20px;position:relative}
+.summary-box{background:#f9f9f9;padding:10px;border-radius:5px;font-size:12px;max-height:280px;overflow-y:auto;text-align:left;margin-bottom:10px;border:1px solid #eee}
+body.latest-tab .nav-bar-wrapper{height:auto;min-height:38px;padding:4px 10px}
+body.latest-tab .nav-bar-wrapper .nav-arrow{display:none}
+body.latest-tab #role-scroll{overflow:visible;white-space:normal}
+body.latest-tab .nav-bar{display:flex;flex-wrap:wrap;justify-content:center;padding:0;white-space:normal}
+body.latest-tab .nav-bar a{padding:5px 3px}
 </style>
 </head>
 <body>
-<main class="shell" id="app">
-  <header class="siteHeader"><div class="siteTitle"><img src="https://cdn.jsdelivr.net/gh/jiwusales/imgh@main/images_1350/icon_9a717cff.png" alt="">JIWU團務進度表</div></header>
-  <nav class="filters" id="filters" aria-label="IP 分類"></nav>
-  <div class="syncInfo" role="status"><span id="syncText">首次同步資料中…</span><button type="button" id="syncRetry" onclick="load()" hidden>重試</button></div>
-  <section class="grid" id="activeGrid" aria-label="團務資料"><div class="skeleton" aria-hidden="true"></div><div class="skeleton" aria-hidden="true"></div><div class="skeleton" aria-hidden="true"></div><div class="skeleton" aria-hidden="true"></div><div class="skeleton" aria-hidden="true"></div><div class="skeleton" aria-hidden="true"></div></section><section id="completeSection" hidden><h2 class="complete">開團考古區</h2><div class="grid" id="completeGrid"></div></section>
-</main>
+
+<div class="top-bar">吉物敗家小幫手</div>
+
+<div class="header-fixed">
+<div class="page-tabs-wrapper"><div class="nav-arrow" onclick="tabScroll.scrollBy(-180,0)">❮</div><div class="scroll-container" id="tab-scroll"><div class="page-tabs" id="page-tabs"></div></div><div class="nav-arrow" onclick="tabScroll.scrollBy(180,0)">❯</div></div>
+<div class="nav-bar-wrapper"><div class="nav-arrow" onclick="roleScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="role-scroll"><div class="nav-bar" id="dynamic-nav"></div></div><div class="nav-arrow" onclick="roleScroll.scrollBy(150,0)">❯</div></div>
+<div class="filter-bar-wrapper"><div class="nav-arrow" onclick="filterScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="filter-scroll"><div id="filter-bar"></div></div><div class="nav-arrow" onclick="filterScroll.scrollBy(150,0)">❯</div></div>
+</div>
+
+<div id="card-container"><div id="items-wrapper"></div></div>
+
+<div id="cart-trigger"><img src="https://images.icon-icons.com/2098/PNG/512/shopping_cart_icon_128753.png"><div id="cart-badge">0</div></div>
+<div id="cart-overlay-bg" onclick="toggleCart(false)"></div>
+
+<div id="cart-panel">
+<div class="cart-header"><span>購物車</span><span style="cursor:pointer;font-size:20px" onclick="toggleCart(false)">✕</span></div>
+<div class="cart-list" id="cart-list"></div>
+<div class="cart-footer"><span class="text-clear" onclick="clearCart()">清空購物車</span><div id="shipping-progress" class="shipping-box"></div><div style="margin-bottom:12px;font-weight:bold;display:flex;justify-content:space-between"><span>原價合計</span><span id="cart-total">¥0</span></div><button class="btn-checkout" onclick="openCheckoutModal()">確認訂購</button></div>
+</div>
+
+<div id="checkout-modal"><div class="modal-content">
+<span onclick="closeModal()" style="position:absolute;top:10px;right:15px;cursor:pointer;color:#ccc">✕</span>
+<h3 style="margin-top:0">確認訂購</h3>
+<div class="summary-box" id="modal-summary-list"></div>
+<div id="modal-shipping" class="shipping-box"></div>
+<div style="text-align:right;font-weight:bold;margin-bottom:10px">原價合計：<span id="modal-total-price">¥0</span></div>
+<button class="btn-checkout" id="send-btn" onclick="handleFinalCheckout()">確認訂購</button>
+</div></div>
+
 <script>
-const API_URL='https://script.google.com/macros/s/AKfycbydO3PzBMzM-kkYqhq-sJOsp6eJOKhpR2PJYV9_NvyfzIBMn6n4il8Mz4_iQj2EWgg5/exec';
-const FALLBACK='https://raw.githubusercontent.com/jiwusales/imgh/main/images/img_20260927162319_04b00fa2.png';
-const CATEGORY_ORDER=['吉伊卡哇&白熊','寶可夢','三麗鷗','海綿寶寶','綜合IP','鬼滅之刃','呪術廻戦','鏈鋸人','坂本日常','銀魂','薰香','冰之城牆&相反','綜合動漫'];
-let data={entries:[],categories:[]},filter='全部';
-const esc=value=>String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-function safeURL(value){try{const url=new URL(value);return /^https?:$/.test(url.protocol)?url.href:''}catch(_){return ''}}
-function thumbnail(value){return 'https://images.weserv.nl/?url='+encodeURIComponent(value)+'&w=640&q=75&output=webp'}
-const CACHE_KEY='jiwu_public_group_work_v1:'+API_URL;
-let loading=false,hasData=false,lastSuccess=0;
-function validData(value){return !!value&&Array.isArray(value.entries)&&Array.isArray(value.categories)&&value.entries.every(entry=>entry&&typeof entry==='object'&&typeof entry.name==='string');}
-function syncInfo(message,retry=false){document.getElementById('syncText').textContent=message;document.getElementById('syncRetry').hidden=!retry;}
-function restoreCache(){
- try{const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(!validData(cached?.data))return false;data=cached.data;hasData=true;render();syncInfo('顯示上次資料，背景更新中…');return true;}catch(_){return false;}
+const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",IMG="https://i.postimg.cc/bv5xRs04/image.png";
+const ORDER_API="https://script.google.com/macros/s/AKfycbz2MEC8O7cjxRLb3xQMGnOLlzfoPc8E_-PDnXjb8sCFph1oLvBAnY30y6OyzcA8iSVt/exec";
+const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop",pocket:"https://chiikawa-pocket-goods-store.com"},ALLOWED=Object.values(SITES);
+const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
+const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
+const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
+
+let savedTab=localStorage.getItem("jiwu_helper_tab");
+let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={},orderLimits={};
+const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
+
+function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
+function getV(r,i){if(i<0||!r.c||!r.c[i])return"";const c=r.c[i];return String(c.v??c.f??"").trim()}
+function originOf(u){try{return new URL(u).origin}catch{return""}}
+function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"ナガノ":o===SITES.mogu?"もぐもぐ本舖":o===SITES.pocket?"ちいかわポケット":hostKey(o)||"未知官網"}
+function yen(v){const n=Number(String(v||"").replace(/[^\d.-]/g,""));return Number.isFinite(n)?n:0}
+function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
+function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
+function buyerText(i){return`${i.source?`(${i.source})`:""}${i.customer||""}`}
+function norm(v){return String(v||"").replace(/\s+/g,"").trim()}
+function productText(i){const n=String(i.name||"").trim(),r=String(i.role||"").trim();return!r||HIDE_ROLES.includes(r)||norm(n).includes(norm(r))?n:`${n} ${r}`}
+
+function hostKey(v){
+try{
+let s=String(v||"").trim();
+if(!/^https?:\/\//i.test(s))s="https://"+s;
+return new URL(s).hostname.replace(/^www\./,"").toLowerCase();
+}catch{return String(v||"").trim().replace(/^www\./,"").toLowerCase().split("/")[0]}
 }
-async function request(action,params={}){
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
- try{const response=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...params}),signal:controller.signal});if(!response.ok)throw new Error('連線失敗（'+response.status+'）');const result=await response.json();if(!result.ok)throw new Error(result.error||'讀取失敗');return result;}
- catch(error){if(error.name==='AbortError')throw new Error('連線逾時，請稍後重試');throw error;}finally{clearTimeout(timer);}
+
+async function loadShippingSettings(){
+try{
+const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("網站運費")}&headers=1`;
+const t=await fetch(url).then(r=>r.text()),d=JSON.parse(t.substr(47).slice(0,-2)),L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
+const U=col(L,"網址"),F=col(L,"免運金額"),S=col(L,"運費"),N=col(L,"備註");
+if(U<0||F<0||S<0||N<0)throw new Error("網站運費分頁缺少「網址、免運金額、運費、備註」欄位");
+const map={};
+(d.table.rows||[]).forEach(r=>{
+const host=hostKey(getV(r,U));
+if(host)map[host]={free:getV(r,F),shipping:getV(r,S),note:getV(r,N)};
+});
+shippingSettings=map;
+}catch(e){
+console.error("網站運費載入失敗",e);
+shippingSettings={};
 }
-async function load(){
- if(loading)return;loading=true;syncInfo(hasData?'顯示上次資料，背景更新中…':'首次同步資料中…');
- try{const next=await request('publicGroupWork');if(!validData(next))throw new Error('團務資料格式不正確');const changed=!hasData||JSON.stringify(next.entries)!==JSON.stringify(data.entries)||JSON.stringify(next.categories)!==JSON.stringify(data.categories);data=next;hasData=true;lastSuccess=Date.now();if(changed)render();try{localStorage.setItem(CACHE_KEY,JSON.stringify({savedAt:lastSuccess,data}));}catch(_){}syncInfo('已同步 '+new Date(lastSuccess).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}));}
- catch(error){if(hasData)syncInfo('更新失敗，保留上次資料：'+error.message,true);else{document.getElementById('activeGrid').innerHTML='<p class="empty">暫時無法取得團務資料，請點「重試」。</p>';syncInfo(error.message,true);}}
- finally{loading=false;}
 }
-function compare(a,b){const ao=Number(a.workOrder),bo=Number(b.workOrder),ha=Number.isFinite(ao)&&ao>0,hb=Number.isFinite(bo)&&bo>0;if(ha||hb){if(ha&&hb)return ao-bo;return ha?-1:1}const date=x=>{const m=String(x.name||'').match(/^(\d{2})(\d{2})/);return m?Number(m[1])*32+Number(m[2]):-1};return date(b)-date(a)}
-function shown(){return data.entries.filter(entry=>filter==='全部'||entry.category===filter).sort(compare)}
-function render(){const available=new Set((data.categories||[]).filter(Boolean)),categories=['全部',...CATEGORY_ORDER.filter(category=>available.has(category))];if(!categories.includes(filter))filter='全部';document.getElementById('filters').innerHTML=categories.map(x=>`<button class="filter" aria-selected="${x===filter}" onclick="setFilter('${esc(x)}')">${esc(x)}</button>`).join('');const entries=shown(),active=entries.filter(x=>x.status!=='下班！'),complete=entries.filter(x=>x.status==='下班！');document.getElementById('activeGrid').innerHTML=cards(active)||'<p class="empty">目前沒有符合的團務資料。</p>';document.getElementById('completeGrid').innerHTML=cards(complete);document.getElementById('completeSection').hidden=!complete.length}
-function cards(entries){return entries.map(entry=>{const image=safeURL(entry.image)||FALLBACK;return `<article class="tile"><img src="${esc(thumbnail(image))}" data-fallback="${esc(image)}" onerror="if(this.src!==this.dataset.fallback)this.src=this.dataset.fallback" alt="" loading="lazy" decoding="async"><strong>${esc(entry.name)}</strong><small>${esc(entry.status)}${entry.arrival?'｜抵台約'+esc(entry.arrival):''}</small></article>`}).join('')}
-function setFilter(value){filter=value;render()}
-restoreCache();
-load();
-setInterval(()=>{if(!document.hidden)load();},60000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastSuccess>15000)load();});
+
+function renderTabs(){
+document.getElementById("page-tabs").innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="page-tab ${currentTab===k?"active":""}" onclick="switchTab('${k}')">${v.label}</button>`).join("");
+}
+
+function findCol(headers,exact=[],partial=[]){
+  let i=col(headers,...exact);
+  if(i>=0)return i;
+  const p=partial.map(norm);
+  return headers.findIndex(h=>p.some(x=>norm(h).includes(x)));
+}
+
+function findCols(headers,exact=[],partial=[]){
+  const ex=exact.map(norm),pa=partial.map(norm),out=[];
+  headers.forEach((h,i)=>{
+    const n=norm(h);
+    if(ex.includes(n)||pa.some(x=>n.includes(x)))out.push(i);
+  });
+  return [...new Set(out)];
+}
+
+function getAnyV(r,indexes){
+  for(const i of indexes){
+    if(i<0||!r.c||!r.c[i])continue;
+    const c=r.c[i];
+    let v=c.v;
+    if((v===null||v===undefined||String(v).trim()==="")&&c.f!==null&&c.f!==undefined)v=c.f;
+    v=String(v??"").trim();
+    if(v!=="")return v;
+  }
+  return"";
+}
+
+function hasSn(i){return String(i?.sn??"").trim()!==""}
+function hasUrl(i){return String(i?.url??"").trim()!==""}
+function isMoguItem(i){
+  return originOf(i?.url)===SITES.mogu||/mogu|もぐもぐ/i.test(String(i?.group||""));
+}
+function itemReady(i){
+  return hasUrl(i)&&(isMoguItem(i)||hasSn(i));
+}
+
+async function getSheet(sheet,force=false){
+  if(!force&&sheetCache[sheet])return sheetCache[sheet];
+
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&headers=1&_=${Date.now()}`;
+  const t=await fetch(url,{cache:"no-store"}).then(r=>r.text());
+  const data=JSON.parse(t.substr(47).slice(0,-2));
+  const L=(data.table.cols||[]).map(c=>String(c.label||"").trim());
+
+  const C={
+    ip:findCol(L,["IP"]),
+    role:findCol(L,["角色"]),
+    type:findCol(L,["種類","類型"]),
+    name:findCol(L,["名稱","商品名稱","品名"]),
+    originalPrice:findCol(L,["原價","商品原價","日幣原價"]),
+    stock:findCol(L,["庫存"]),
+    sn:findCols(L,["貨號","商品貨號","商品編號","品番","SKU","sku"],["貨號","SKU","品番"]),
+    img:findCol(L,["圖片","首圖","圖片網址"]),
+    url:findCol(L,["商品網址","網址","URL","url","商品URL"],["商品網址","URL"]),
+    status:findCol(L,["狀態"]),
+    group:findCol(L,["團名"]),
+    source:findCol(L,["來源"]),
+    customer:findCol(L,["顧客名稱","購買人","訂購人"])
+  };
+
+  const rows=(data.table.rows||[]).map(r=>({
+    ip:getV(r,C.ip),
+    role:getV(r,C.role),
+    type:getV(r,C.type),
+    name:getV(r,C.name),
+    originalPrice:getV(r,C.originalPrice),
+    colStock:getV(r,C.stock),
+    sn:getAnyV(r,C.sn),
+    img:getV(r,C.img),
+    url:getV(r,C.url),
+    status:getV(r,C.status),
+    group:getV(r,C.group),
+    source:getV(r,C.source),
+    customer:getV(r,C.customer)
+  }));
+
+  sheetCache[sheet]=rows;
+  return rows;
+}
+
+async function loadOrderedCounts(){
+  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("已訂購清單")}&headers=1&_=${Date.now()}`;
+  const t=await fetch(url,{cache:"no-store"}).then(r=>r.text());
+  const d=JSON.parse(t.substr(47).slice(0,-2));
+  const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
+
+  const S=findCols(L,["貨號","商品貨號","SKU"],["貨號","SKU"]);
+  const N=findCol(L,["名稱","商品名稱","品名"]);
+  const Q=findCol(L,["數量"]);
+  const O=findCol(L,["缺貨"]);
+  const ok={},bad={};
+
+  (d.table.rows||[]).forEach(r=>{
+    const sn=getAnyV(r,S),name=getV(r,N);
+    if(!sn&&!name)return;
+    const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
+    ok[key]=(ok[key]||0)+(Number(getV(r,Q))||0);
+    bad[key]=(bad[key]||0)+(Number(getV(r,O))||0);
+  });
+
+  orderedCounts=ok;
+  soldOutCounts=bad;
+}
+
+function productUrlKey(v){
+  try{
+    const u=new URL(String(v||"").trim());
+    return u.hostname.replace(/^www\./,"").toLowerCase()+u.pathname.replace(/\/+$/,"");
+  }catch{return norm(v)}
+}
+
+function findStock(item,stock){
+  const sn=String(item.sn??"").trim();
+
+  if(sn){
+    const s=stock.find(x=>String(x.sn??"").trim()===sn);
+    if(s)return s;
+  }
+
+  const url=productUrlKey(item.url);
+  if(url){
+    const s=stock.find(x=>productUrlKey(x.url)===url);
+    if(s)return s;
+  }
+
+  const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`);
+  return stock.find(x=>(norm(x.name)===name&&norm(x.role)===role)||norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full)||null;
+}
+
+function mergeStock(item,stock){
+  const s=findStock(item,stock);
+  return{
+    ...item,
+    ip:item.ip||s?.ip||"",
+    role:item.role||s?.role||"",
+    type:item.type||s?.type||"",
+    img:s?.img||item.img||"",
+    url:item.url||s?.url||"",
+    sn:hasSn(item)?String(item.sn).trim():(s?.sn??""),
+    originalPrice:s?.originalPrice||item.originalPrice||""
+  };
+}
+
+function mergeLatestPrice(item,latest){
+  const s=findStock(item,latest);
+  return{
+    ...item,
+    img:s?.img||item.img||"",
+    sn:hasSn(item)?String(item.sn).trim():(s?.sn??""),
+    url:item.url||s?.url||"",
+    originalPrice:s?.originalPrice||item.originalPrice||""
+  };
+}
+
+const imageCache={};
+
+async function getProductImage(url){
+  if(!url)return"";
+  if(imageCache[url]!==undefined)return imageCache[url];
+
+  try{
+    const u=new URL(url),m=u.pathname.match(/\/products\/([^/?#]+)/);
+
+    if(m){
+      try{
+        const r=await fetch(`${u.origin}/products/${m[1]}.js`);
+        if(r.ok){
+          const p=await r.json();
+          const img=p.featured_image||p.images?.[0]||"";
+          if(img)return imageCache[url]=String(img).replace(/^\/\//,"https://");
+        }
+      }catch{}
+    }
+
+    const r=await fetch(url);
+    if(!r.ok)return imageCache[url]="";
+
+    const html=await r.text();
+    const d=new DOMParser().parseFromString(html,"text/html");
+    const img=d.querySelector('meta[property="og:image:secure_url"]')?.content||
+      d.querySelector('meta[property="og:image"]')?.content||
+      d.querySelector('meta[name="twitter:image"]')?.content||"";
+
+    return imageCache[url]=img?new URL(img,url).href:"";
+  }catch{return imageCache[url]=""}
+}
+
+async function fillMissingImages(rows){
+  await Promise.all(rows.map(async i=>{if(!i.img&&i.url)i.img=await getProductImage(i.url)}));
+  return rows;
+}
+
+function filterNormal(rows,key){
+  const ok=i=>["0","1"].includes(i.colStock);
+  if(key==="chiikawa")return rows.filter(i=>i.name&&ok(i)&&["ちいかわ","ちいかわ樂園"].includes(i.ip)&&originOf(i.url)===SITES.chiikawa);
+  if(key==="nagano")return rows.filter(i=>i.name&&ok(i)&&i.ip==="ナガノ"&&originOf(i.url)===SITES.nagano);
+  return rows.filter(i=>i.name&&ok(i)&&i.ip==="ちいかわ"&&originOf(i.url)===SITES.mogu);
+}
+
+async function switchTab(key){
+  currentTab=key;
+  selectedTypes=[];
+  selectedRole=null;
+  localStorage.setItem("jiwu_helper_tab",key);
+  window.scrollTo(0,0);
+
+  document.body.classList.toggle("latest-tab",key==="latest"||key==="reminder");
+  renderTabs();
+
+  document.querySelector(".nav-bar-wrapper").style.display="flex";
+  document.querySelector(".filter-bar-wrapper").style.display=["pending","latest","reminder"].includes(key)?"none":"flex";
+  document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
+
+  try{
+    let rows=await getSheet(TABS[key].sheet,true),stock;
+    await loadOrderedCounts();
+
+    if(key==="pending"){
+      stock=await getSheet("商品庫存",true);
+
+      rows=rows
+        .filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group))
+        .map(i=>mergeStock(i,stock));
+
+      const groupSite={};
+      rows.forEach(i=>{
+        const o=originOf(i.url);
+        if(i.group&&ALLOWED.includes(o))groupSite[norm(i.group)]=o;
+      });
+
+      rows=rows
+        .filter(i=>ALLOWED.includes(originOf(i.url))||(i.group&&groupSite[norm(i.group)]))
+        .map(i=>({...i,_siteOrigin:originOf(i.url)||groupSite[norm(i.group)]||""}));
+
+    }else if(key==="latest"||key==="reminder"){
+      stock=await getSheet("商品庫存",true);
+      const latest=await getSheet("最新開團",true);
+
+      rows=rows
+        .filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
+        .map(i=>mergeStock(i,stock))
+        .map(i=>mergeLatestPrice(i,latest));
+
+      /*
+        一般網站：貨號＋網址才算完整
+        もぐもぐ本舖：只要有商品網址就算完整，不需要貨號
+      */
+      const latestGroups=new Set(
+        rows.filter(i=>norm(i.group)&&itemReady(i)).map(i=>norm(i.group))
+      );
+
+      if(key==="latest"){
+        rows=rows.filter(i=>i.group?latestGroups.has(norm(i.group)):itemReady(i));
+      }else{
+        rows=rows.filter(i=>i.group?!latestGroups.has(norm(i.group)):!itemReady(i));
+      }
+
+    }else{
+      rows=filterNormal(rows,key);
+    }
+
+    rows=await fillMissingImages(rows);
+
+    allItems=rows.map(i=>({
+      ...i,
+      category:key==="pending"
+        ?siteName(i._siteOrigin||originOf(i.url))
+        :(key==="latest"||key==="reminder")
+          ?(i.group||"其他")
+          :(i.role||i.ip||i.group||"其他"),
+      type:i.type||"其他"
+    }));
+
+    allCategories=[...new Set(allItems.map(i=>i.category).filter(Boolean))];
+    allTypes=[...new Set(allItems.map(i=>i.type).filter(Boolean))];
+
+    renderRoleNav();
+    if(["pending","latest","reminder"].includes(key))document.getElementById("filter-bar").innerHTML="";
+    else renderFilters();
+
+    renderItems();
+
+    requestAnimationFrame(()=>{
+      document.getElementById("card-container").style.paddingTop=40+document.querySelector(".header-fixed").offsetHeight+"px";
+    });
+
+  }catch(e){
+    console.error(e);
+    document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>";
+  }
+}
+
+function normalTab(){return["chiikawa","nagano","mogu"].includes(currentTab)}
+
+function renderRoleNav(){
+const cats=allCategories;
+document.getElementById("dynamic-nav").innerHTML=cats.map(c=>`<a class="${selectedRole===c?"active-role":""}" onclick='toggleRole(${JSON.stringify(c)})'>${c}</a>`).join("");
+}
+
+function toggleRole(c){
+selectedRole=selectedRole===c?null:c;
+scrollTo({top:0,behavior:"smooth"});
+renderRoleNav();renderItems();
+}
+
+function renderFilters(){
+document.getElementById("filter-bar").innerHTML=allTypes.map(t=>`<label class="filter-item ${selectedTypes.includes(t)?"active":""}"><input type="checkbox" ${selectedTypes.includes(t)?"checked":""} onchange='toggleType(${JSON.stringify(t)})'>${t}</label>`).join("");
+}
+
+function toggleType(t){
+selectedTypes=selectedTypes.includes(t)?selectedTypes.filter(x=>x!==t):[...selectedTypes,t];
+renderFilters();renderItems();
+}
+
+const ORDER_TARGET=11000;
+
+function isAutoOrderItem(i){return ALLOWED.includes(originOf(i.url))}
+function isTmall(i){return /天貓/.test(String(i.name||""))}
+function planGroup(items){return ["pending","latest","reminder"].includes(currentTab)&&items.some(i=>isAutoOrderItem(i)&&!isTmall(i))}
+function itemOrderKey(i){return norm(i.sn)||norm(`${i.name}|${i.role}`)}
+function isLimitedDoll(i){
+const n=norm(i.name);
+/* 名稱只要有明確「其他品項」文字，就不算娃；沒有標明品項時一律視為吊娃／娃 */
+const other=/(貼紙|貼紙組|ステッカー|シール|鑰匙圈|鑰匙扣|キーホルダー|キーリング|吊飾|チャーム|ストラップ|徽章|胸章|缶バッジ|立牌|壓克力|アクリル|卡片|卡套|カード|明信片|ポストカード|資料夾|ファイル|便條|メモ|紙膠帶|マスキングテープ|筆|文具|印章|スタンプ|磁鐵|マグネット|夾子|クリップ|手機殼|手機|ケース|リング|包包|提袋|袋子|托特包|バッグ|トート|ポーチ|收納包|束口袋|巾着|錢包|財布|衣服|服飾|T恤|Ｔ恤|上衣|外套|帽子|襪子|Tシャツ|シャツ|パーカー|キャップ|ソックス|毛巾|手帕|タオル|ハンカチ|杯子|馬克杯|水杯|玻璃杯|マグ|タンブラー|コップ|盤子|餐盤|托盤|碗|筷子|湯匙|叉子|皿|プレート|トレー|ボウル|スプーン|フォーク|便當盒|餐具|收納盒|盒子|ケース|鏡子|鏡|ミラー|梳子|ブラシ|毯子|毛毯|抱枕|坐墊|クッション|ブランケット|公仔|模型|フィギュア|娃衣|ぬい服|ぬいぐるみ用|収納)/i;
+if(other.test(n))return false;
+return true;
+}
+function itemCartLimit(i,dollLimit){return isLimitedDoll(i)?Math.max(1,Math.min(2,Number(dollLimit)||1)):Infinity}
+
+function buildPlanAttempt(items,dollLimit,carCount,randomize=false){
+const cars=Array.from({length:carCount},()=>({items:[],total:0,counts:{}}));
+const byKey={};
+items.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
+let groups=Object.values(byKey).map(a=>[...a]);
+if(randomize)groups.sort(()=>Math.random()-.5);
+groups.sort((a,b)=>{
+const qa=Math.ceil(a.length/itemCartLimit(a[0],dollLimit)),qb=Math.ceil(b.length/itemCartLimit(b[0],dollLimit));
+return qb-qa||b.length-a.length||Math.max(...b.map(x=>yen(x.originalPrice)))-Math.max(...a.map(x=>yen(x.originalPrice)));
+});
+
+groups.forEach(group=>{
+if(randomize)group.sort(()=>Math.random()-.5);else group.sort((a,b)=>yen(b.originalPrice)-yen(a.originalPrice));
+group.forEach(i=>{
+const k=itemOrderKey(i),limit=itemCartLimit(i,dollLimit);
+let choices=cars.filter(c=>(c.counts[k]||0)<limit);
+if(!choices.length)return;
+choices.sort((a,b)=>{
+const ad=Math.max(0,ORDER_TARGET-a.total),bd=Math.max(0,ORDER_TARGET-b.total);
+const as=Math.abs(ad-yen(i.originalPrice)),bs=Math.abs(bd-yen(i.originalPrice));
+if(a.total<ORDER_TARGET&&b.total>=ORDER_TARGET)return-1;
+if(b.total<ORDER_TARGET&&a.total>=ORDER_TARGET)return 1;
+return as-bs||a.total-b.total||(randomize?Math.random()-.5:0);
+});
+const c=choices[0];
+c.items.push(i);c.total+=yen(i.originalPrice);c.counts[k]=(c.counts[k]||0)+1;
+});
+});
+return cars;
+}
+
+function planScore(cars){
+const under=cars.filter(c=>c.total<ORDER_TARGET),def=under.reduce((s,c)=>s+ORDER_TARGET-c.total,0);
+const spread=Math.max(...cars.map(c=>c.total))-Math.min(...cars.map(c=>c.total));
+return under.length*1e9+def*1e4+spread;
+}
+
+function makeOrderPlan(items,dollLimit){
+const usable=items.filter(i=>!isTmall(i));
+if(!usable.length)return[];
+const byKey={};usable.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
+const total=usable.reduce((s,i)=>s+yen(i.originalPrice),0);
+const minCars=Math.max(1,...Object.values(byKey).map(a=>Math.ceil(a.length/itemCartLimit(a[0],dollLimit))));
+let carCount=Math.max(minCars,Math.floor(total/ORDER_TARGET)||1),best=null;
+
+for(let n=carCount;n>=minCars;n--){
+if(total<n*ORDER_TARGET)continue;
+let local=null;
+for(let t=0;t<250;t++){
+const cars=buildPlanAttempt(usable,dollLimit,n,t>0);
+if(cars.some(c=>!c.items.length))continue;
+if(!local||planScore(cars)<planScore(local))local=cars;
+if(cars.every(c=>c.total>=ORDER_TARGET)){best=cars;break}
+}
+if(best)break;
+if(local&&!best)best=local;
+}
+
+if(!best){
+best=buildPlanAttempt(usable,dollLimit,minCars,false);
+for(let t=0;t<250;t++){
+const x=buildPlanAttempt(usable,dollLimit,minCars,true);
+if(planScore(x)<planScore(best))best=x;
+}
+}
+return best.filter(c=>c.items.length);
+}
+
+function addPlannedCart(items,btn){
+cart.push(...items);saveCart();updateCartUI();
+btn.textContent="✓";setTimeout(()=>btn.textContent="＋",1000);
+}
+
+function renderOrderPlan(target,items,dollLimit,card){
+target.innerHTML="";
+const cars=makeOrderPlan(items,dollLimit);
+let dragging=null;
+
+function recalcCar(c){
+c.total=c.items.reduce((s,i)=>s+yen(i.originalPrice),0);
+c.counts={};
+c.items.forEach(i=>{const k=itemOrderKey(i);c.counts[k]=(c.counts[k]||0)+1});
+}
+
+function updateRow(n){
+const row=target.querySelector(`.auto-order-row[data-car="${n}"]`);if(!row)return;
+const c=cars[n],ok=c.total>=ORDER_TARGET;
+row.querySelector(".auto-order-count").textContent=`${c.items.length}件`;
+row.querySelector(".auto-order-total").textContent=`¥${fmt(c.total)}`;
+const st=row.querySelector(".auto-order-status");
+st.className=`auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}`;
+st.textContent=ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`;
+}
+
+function makeDraggable(el,item,carIndex){
+el.draggable=true;
+el.__orderItem=item;
+el.__carIndex=carIndex;
+el.addEventListener("dragstart",e=>{
+dragging={el,item,from:el.__carIndex};
+el.classList.add("dragging");
+e.dataTransfer.effectAllowed="move";
+try{e.dataTransfer.setData("text/plain",itemOrderKey(item))}catch{}
+});
+el.addEventListener("dragend",()=>{
+el.classList.remove("dragging");
+target.querySelectorAll(".auto-order-grid.drag-over").forEach(g=>g.classList.remove("drag-over"));
+dragging=null;
+});
+}
+
+cars.forEach((c,n)=>{
+const row=document.createElement("div");
+row.className="auto-order-row";
+row.dataset.car=n;
+const ok=c.total>=ORDER_TARGET;
+row.innerHTML=`<div class="auto-order-no">${n+1}</div><div class="auto-order-main"><div class="auto-order-meta"><span class="auto-order-count">${c.items.length}件</span><span class="auto-order-total">¥${fmt(c.total)}</span><span class="auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`}</span></div><div class="auto-order-grid" data-car="${n}"></div></div><button class="auto-order-add">＋</button>`;
+const grid=row.querySelector(".auto-order-grid");
+
+c.items.forEach(i=>{
+const el=card(i);makeDraggable(el,i,n);grid.appendChild(el);
+});
+
+grid.addEventListener("dragover",e=>{e.preventDefault();if(dragging&&dragging.from!==n){grid.classList.add("drag-over");e.dataTransfer.dropEffect="move"}});
+grid.addEventListener("dragleave",e=>{if(!grid.contains(e.relatedTarget))grid.classList.remove("drag-over")});
+grid.addEventListener("drop",e=>{
+e.preventDefault();grid.classList.remove("drag-over");
+if(!dragging||dragging.from===n)return;
+const from=dragging.from,to=n,item=dragging.item,key=itemOrderKey(item),limit=itemCartLimit(item,dollLimit);
+const current=cars[to].items.filter(x=>itemOrderKey(x)===key).length;
+if(Number.isFinite(limit)&&current>=limit)return alert(`娃類商品這一車最多只能放 ${limit} 個`);
+const idx=cars[from].items.indexOf(item);if(idx<0)return;
+cars[from].items.splice(idx,1);cars[to].items.push(item);
+recalcCar(cars[from]);recalcCar(cars[to]);
+dragging.el.__carIndex=to;grid.appendChild(dragging.el);
+updateRow(from);updateRow(to);
+});
+
+row.querySelector(".auto-order-add").onclick=e=>addPlannedCart(c.items,e.currentTarget);
+target.appendChild(row);
+});
+if(!cars.length)target.innerHTML="<div style='font-size:11px;color:#999'>沒有可排單商品</div>";
+}
+
+function renderItems(){
+  const box=document.getElementById("items-wrapper");
+  box.innerHTML="";
+
+  let items=selectedTypes.length?allItems.filter(i=>selectedTypes.includes(i.type)):allItems;
+  if(selectedRole)items=items.filter(i=>i.category===selectedRole);
+  if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
+
+  const remainOrdered={...orderedCounts},remainSoldOut={...soldOutCounts};
+  const showOrdered=["pending","latest","reminder"].includes(currentTab);
+  const statusMap=new WeakMap();
+
+  items.forEach(i=>{
+    const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+    let status="";
+    if(showOrdered&&(remainOrdered[key]||0)>0){status="ordered";remainOrdered[key]--}
+    else if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
+    statusMap.set(i,status);
+    i._orderStatus=status;
+  });
+
+  const card=i=>createCard(i,statusMap.get(i)||"");
+  const grid=a=>{
+    if(!a.length)return;
+    const g=document.createElement("div");
+    g.className="group-grid";
+    a.forEach(i=>g.appendChild(card(i)));
+    box.appendChild(g);
+  };
+
+  if(!selectedTypes.length){
+    const categories=selectedRole?[selectedRole]:allCategories;
+
+    categories.forEach(c=>{
+      const a=items.filter(i=>i.category===c);
+      if(!a.length)return;
+
+      const d=document.createElement("div");
+      d.className="type-divider";
+
+      const title=document.createElement("span");
+      title.textContent=c;
+      d.appendChild(title);
+
+      if(["pending","latest","reminder"].includes(currentTab)){
+        const btn=document.createElement("button");
+        btn.className="category-add-all";
+        btn.textContent="➕";
+        btn.onclick=e=>addCategoryToCart(e,c);
+        d.appendChild(btn);
+
+        if(planGroup(a)){
+          const input=document.createElement("input");
+          input.className="order-limit-input";
+          input.type="number";
+          input.min="1";
+          input.max="2";
+          input.inputMode="numeric";
+          input.placeholder="數量";
+          input.title="只限制吊娃／娃，每車可放 1 或 2 個";
+          input.value=orderLimits[c]||"";
+          d.appendChild(input);
+
+          const confirmBtn=document.createElement("button");
+          confirmBtn.className="order-limit-confirm";
+          confirmBtn.textContent="確認";
+          d.appendChild(confirmBtn);
+
+          box.appendChild(d);
+
+          input.oninput=()=>{
+            let v=String(input.value||"").replace(/[^12]/g,"");
+            if(v.length>1)v=v.slice(-1);
+            input.value=v;
+          };
+
+          confirmBtn.onclick=()=>{
+            const v=String(input.value||"").trim();
+            if(!v){delete orderLimits[c];renderItems();return}
+            if(!["1","2"].includes(v))return alert("娃類限購數量請輸入 1 或 2");
+            orderLimits[c]=v;
+            renderItems();
+          };
+
+          if(!orderLimits[c]){
+            grid(a);
+            return;
+          }
+
+          const plan=document.createElement("div");
+          plan.className="auto-order-wrap";
+          box.appendChild(plan);
+
+          const planItems=a.filter(i=>!isTmall(i)&&!(statusMap.get(i)||""));
+          const excludedItems=a.filter(i=>isTmall(i)||(statusMap.get(i)||""));
+
+          renderOrderPlan(plan,planItems,orderLimits[c],card);
+          if(excludedItems.length)grid(excludedItems);
+          return;
+        }
+      }
+
+      box.appendChild(d);
+      grid(a);
+    });
+
+  }else{
+    grid(items);
+  }
+}
+
+function createCard(item,status=""){
+  const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
+  const noSn=!hasSn(item),noUrl=!hasUrl(item),mogu=isMoguItem(item);
+
+  let miss="";
+  if(rem){
+    let msg="";
+    if(mogu){
+      if(noUrl)msg="缺商品網址";
+    }else{
+      if(noSn&&noUrl)msg="缺貨號、商品網址";
+      else if(noSn)msg="缺貨號";
+      else if(noUrl)msg="缺商品網址";
+    }
+    if(msg)miss=`<div style="font-size:9px;color:#e66;margin-bottom:5px">${msg}</div>`;
+  }
+
+  const warn=normalTab()&&item.colStock==="1";
+  const link=item.url?`<a class="product-link" href="${item.url}" target="_blank" onclick="event.stopPropagation()">商品頁面</a>`:"";
+
+  c.className="card";
+  c.innerHTML=
+  `${status==="ordered"?'<div class="ordered-tag">✓</div>':""}
+  ${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
+  ${warn?'<div class="stock-warning">☝🏻</div>':""}
+  ${(!status&&(!rem||item.url))?'<div class="add-btn-tag">＋</div>':""}
+  <img src="${item.img||IMG}">
+  ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
+  <div class="name" title="${productText(item)}">${productText(item)}</div>
+  <div class="price">${priceText(item.originalPrice)}</div>
+  ${link}${miss}`;
+
+  const btn=c.querySelector(".add-btn-tag");
+  if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
+  c.onclick=()=>zoomCard(c);
+  return c;
+}
+
+function zoomCard(c){
+const o=document.createElement("div");
+o.className="card-overlay";
+o.appendChild(c.cloneNode(true));
+o.onclick=()=>o.remove();
+document.body.appendChild(o);
+}
+
+function saveCart(){localStorage.setItem("jiwu_helper_cart",JSON.stringify(cart))}
+
+function addToCart(e,item){
+e.stopPropagation();
+cart.push(item);saveCart();updateCartUI();
+e.currentTarget.style.opacity=.4;
+setTimeout(()=>e.currentTarget.style.opacity=1,120);
+}
+
+function addCategoryToCart(e,category){
+e.stopPropagation();
+let items=allItems.filter(i=>i.category===category&&!i._orderStatus);
+if(currentTab==="reminder")items=items.filter(i=>i.url).map(i=>({...i,urlOnly:true}));
+if(!items.length)return alert("這個分類沒有可加入的商品");
+cart.push(...items);saveCart();updateCartUI();
+e.currentTarget.textContent=`✓ ${items.length}件`;
+setTimeout(()=>e.currentTarget.textContent="全品項＋",1000);
+}
+
+function removeFromCart(i){
+cart.splice(i,1);saveCart();updateCartUI();
+if(document.getElementById("checkout-modal").style.display==="flex")renderCheckoutSummary();
+}
+
+function clearCart(){
+if(confirm("確定要清空購物車嗎？")){cart=[];saveCart();updateCartUI()}
+}
+
+function toggleCart(v){
+document.getElementById("cart-panel").classList.toggle("open",v);
+document.getElementById("cart-overlay-bg").style.display=v?"block":"none";
+}
+
+function cartInfo(){
+const groups={};let total=0;
+cart.forEach(i=>{
+const o=originOf(i.url)||"未知官網",p=yen(i.originalPrice);
+total+=p;
+if(!groups[o])groups[o]={total:0,missing:0};
+groups[o].total+=p;
+if(!p)groups[o].missing++;
+});
+return{groups,total};
+}
+
+function shippingHtml(){
+const {groups}=cartInfo();
+if(!Object.keys(groups).length)return"尚未加入商品";
+return Object.entries(groups).map(([o,g])=>{
+const cfg=shippingSettings[hostKey(o)],warn=g.missing?` <span style="color:#aaa">(${g.missing}件無原價)</span>`:"";
+if(!cfg)return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br><span style="color:#aaa">找不到運費設定</span>${warn}</div>`;
+
+const freeRaw=String(cfg.free||"").trim(),fee=yen(cfg.shipping),note=String(cfg.note||"").trim();
+let info="";
+
+if(/^x$/i.test(freeRaw)){
+info=fee?`運費 <b>¥${fmt(fee)}</b>`:"運費未設定";
+}else{
+const free=yen(freeRaw);
+if(!free)info=fee?`運費 <b>¥${fmt(fee)}</b>　<span style="color:#aaa">免運金額未設定</span>`:"運費、免運金額未設定";
+else if(g.total>=free)info="<b>✓ 已達免運</b>";
+else info=`${fee?`運費 <b>¥${fmt(fee)}</b>　`:"運費未設定　"}還差 <b>¥${fmt(free-g.total)}</b> 免運`;
+}
+
+return `<div><b>${siteName(o)}</b>　¥${fmt(g.total)}<br>${info}${warn}${note?`<br><span style="color:#888">${note}</span>`:""}</div>`;
+}).join("<hr style='border:0;border-top:1px solid #eee'>");
+}
+
+function updateCartUI(){
+document.getElementById("cart-list").innerHTML=cart.map((i,n)=>{
+const b=buyerText(i);
+return `<div class="cart-item"><img src="${i.img||IMG}"><div class="cart-item-info">${b?`<div style="color:#989FC0;font-weight:bold;white-space:nowrap">${b}</div>`:""}<div style="font-weight:bold;white-space:nowrap">${productText(i)}</div><div style="color:#F68450;font-weight:bold">${priceText(i.originalPrice)}</div></div><span style="cursor:pointer;color:#ccc;padding:5px" onclick="removeFromCart(${n})">✕</span></div>`;
+}).join("");
+
+const b=document.getElementById("cart-badge"),x=cartInfo();
+b.textContent=cart.length;b.style.display=cart.length?"flex":"none";
+document.getElementById("cart-total").textContent=`¥${fmt(x.total)}`;
+document.getElementById("shipping-progress").innerHTML=shippingHtml();
+}
+
+function openCheckoutModal(){
+if(!cart.length)return alert("購物車是空的唷！");
+toggleCart(false);renderCheckoutSummary();
+document.getElementById("checkout-modal").style.display="flex";
+}
+
+function closeModal(){document.getElementById("checkout-modal").style.display="none"}
+
+function renderCheckoutSummary(){
+document.getElementById("modal-summary-list").innerHTML=cart.map(i=>{
+const b=buyerText(i);
+return `<div class="cart-item"><img src="${i.img||IMG}"><div class="cart-item-info">${b?`<div style="color:#989FC0;font-weight:bold;white-space:nowrap">${b}</div>`:""}<div style="font-weight:bold;white-space:nowrap">${productText(i)}</div><div style="color:#F68450;font-weight:bold">${priceText(i.originalPrice)}</div></div></div>`;
+}).join("");
+
+document.getElementById("modal-total-price").textContent=`¥${fmt(cartInfo().total)}`;
+document.getElementById("modal-shipping").innerHTML=shippingHtml();
+}
+
+const CART_RULES={};
+
+function cartHost(url){
+try{return new URL(url).hostname.replace(/^www\./,"")}catch{return""}
+}
+
+async function tryShopify(item){
+  try{
+    const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
+    if(!m)return null;
+
+    const r=await fetch(`${u.origin}/products/${m[1]}.js`);
+    if(!r.ok)return null;
+
+    const p=await r.json(),vs=p.variants||[],vid=u.searchParams.get("variant");
+    let v;
+
+    // 網址本身有 variant 時優先使用
+    if(vid)v=vs.find(x=>String(x.id)===String(vid));
+
+    if(!v){
+      const isMogu=u.origin===SITES.mogu;
+
+      // もぐもぐ本舖：不驗證你輸入的貨號是不是官網 SKU
+      if(isMogu||item.urlOnly||item.useUrl||!hasSn(item)){
+        v=vs.find(x=>x.available!==false)||vs[0];
+      }else{
+        v=vs.find(x=>String(x.sku||"").trim()===String(item.sn||"").trim());
+      }
+    }
+
+    if(!v?.id)return null;
+
+    return{
+      kind:"shopify",
+      origin:u.origin,
+      id:String(v.id),
+      available:v.available!==false,
+      item
+    };
+
+  }catch{
+    return null;
+  }
+}
+
+async function tryWooCommerce(item){
+try{
+const u=new URL(item.url);
+const direct=u.searchParams.get("add-to-cart");
+
+if(direct)return{
+kind:"woocommerce",
+url:item.url,
+item
+};
+
+const r=await fetch(item.url);
+if(!r.ok)return null;
+
+const html=await r.text();
+
+const id=
+html.match(/name=["']add-to-cart["'][^>]*value=["'](\d+)/i)?.[1]||
+html.match(/value=["'](\d+)["'][^>]*name=["']add-to-cart["']/i)?.[1];
+
+if(!id)return null;
+
+return{
+kind:"woocommerce",
+url:`${u.origin}/?add-to-cart=${id}&quantity=1`,
+item
+};
+
+}catch{
+return null;
+}
+}
+
+async function resolveCartItem(item){
+if(!item.url)return{kind:"missing",item};
+
+const host=cartHost(item.url);
+
+if(CART_RULES[host]){
+try{
+const x=await CART_RULES[host](item);
+if(x)return x;
+}catch{}
+}
+
+const shopify=await tryShopify(item);
+if(shopify)return shopify;
+
+const woo=await tryWooCommerce(item);
+if(woo)return woo;
+
+return{
+kind:"page",
+url:item.url,
+item
+};
+}
+
+async function makeCartData(items){
+const result=await Promise.all(items.map(resolveCartItem)),shopify={},woo={},destinations=[];
+
+result.filter(x=>x.kind==="shopify"&&x.available).forEach(x=>{
+const g=shopify[x.origin]??={qty:{}};
+g.qty[x.id]=(g.qty[x.id]||0)+1;
+});
+
+Object.entries(shopify).forEach(([o,g])=>destinations.push({
+kind:"cart",
+url:`${o}/cart/${Object.entries(g.qty).map(([id,n])=>`${id}:${n}`).join(",")}`
+}));
+
+result.filter(x=>x.kind==="woocommerce").forEach(x=>{
+const g=woo[x.url]??={count:0};
+g.count++;
+});
+
+Object.entries(woo).forEach(([url,g])=>{
+const u=new URL(url);
+u.searchParams.set("quantity",g.count);
+destinations.push({kind:"cart",url:u.href});
+});
+
+[...new Set(result.filter(x=>x.kind==="page").map(x=>x.url))]
+.forEach(url=>destinations.push({kind:"page",url}));
+
+return{
+destinations,
+ordered:[
+...result.filter(x=>x.kind==="shopify"&&x.available).map(x=>x.item),
+...result.filter(x=>x.kind==="woocommerce").map(x=>x.item)
+],
+soldOut:result.filter(x=>x.kind==="shopify"&&!x.available).map(x=>x.item),
+unresolved:[...result.filter(x=>x.kind==="page").map(x=>x.item),...result.filter(x=>x.kind==="missing").map(x=>x.item)]
+};
+}
+
+function recordOrderedList(ordered,soldOut){
+const pack=a=>a.map(i=>({
+group:i.group||"",
+sn:String(i.sn||"").trim(),
+name:String(i.name||"").trim(),
+note:i.note||"",
+extra:i.__extra===true
+}));
+
+const body=JSON.stringify({
+action:"recordOrder",
+ordered:pack(ordered),
+soldOut:pack(soldOut)
+});
+
+const blob=new Blob([body],{type:"text/plain;charset=utf-8"});
+if(!navigator.sendBeacon||!navigator.sendBeacon(ORDER_API,blob))
+fetch(ORDER_API,{method:"POST",body,keepalive:true,mode:"no-cors"}).catch(()=>{});
+}
+
+async function handleFinalCheckout(){
+const btn=document.getElementById("send-btn");
+btn.disabled=true;
+btn.textContent="正在辨識購物車...";
+
+const spare=[];
+
+try{
+const uniqueUrls=[...new Set(cart.map(i=>i.url).filter(Boolean))];
+
+for(let i=1;i<uniqueUrls.length;i++){
+const w=window.open("about:blank","_blank");
+if(!w){
+spare.forEach(x=>{try{x.close()}catch{}});
+throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視窗");
+}
+spare.push(w);
+}
+
+const data=await makeCartData(cart);
+const manual=data.unresolved.map(i=>({...i,note:"🖥️"}));
+
+recordOrderedList([...data.ordered,...manual],data.soldOut);
+
+data.soldOut.forEach(i=>{
+const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+soldOutCounts[key]=(soldOutCounts[key]||0)+1;
+});
+
+const used=data.destinations.slice(1);
+used.forEach((d,i)=>{if(spare[i])spare[i].location.href=d.url});
+spare.slice(used.length).forEach(w=>{try{w.close()}catch{}});
+
+cart=[];
+saveCart();
+updateCartUI();
+closeModal();
+
+if(!data.destinations.length){
+renderItems();
+if(data.soldOut.length)alert("購物車內商品目前都已缺貨，已記錄缺貨");
+btn.disabled=false;
+btn.textContent="確認訂購";
+return;
+}
+
+location.href=data.destinations[0].url;
+
+}catch(e){
+spare.forEach(w=>{try{w.close()}catch{}});
+console.error(e);
+alert(e.message);
+btn.disabled=false;
+btn.textContent="確認訂購";
+}
+}
+
+(function(){
+const el=document.getElementById("cart-trigger");
+let drag=false,sx,sy,ix,iy;
+
+function start(e){
+drag=false;
+const p=e.touches?e.touches[0]:e,r=el.getBoundingClientRect();
+sx=p.clientX;sy=p.clientY;ix=r.left;iy=r.top;
+document.addEventListener("mousemove",move);
+document.addEventListener("touchmove",move,{passive:false});
+document.addEventListener("mouseup",end);
+document.addEventListener("touchend",end);
+}
+
+function move(e){
+const p=e.touches?e.touches[0]:e,dx=p.clientX-sx,dy=p.clientY-sy;
+if(Math.abs(dx)>5||Math.abs(dy)>5){
+drag=true;
+if(e.cancelable)e.preventDefault();
+el.style.left=ix+dx+"px";
+el.style.top=iy+dy+"px";
+el.style.right="auto";
+}
+}
+
+function end(){
+document.removeEventListener("mousemove",move);
+document.removeEventListener("touchmove",move);
+document.removeEventListener("mouseup",end);
+document.removeEventListener("touchend",end);
+
+if(drag){
+const r=el.getBoundingClientRect();
+el.style.left=(r.left+r.width/2<innerWidth/2?10:innerWidth-r.width-10)+"px";
+el.style.top=Math.max(50,Math.min(r.top,innerHeight-60))+"px";
+}
+}
+
+el.onclick=e=>drag?e.preventDefault():toggleCart(true);
+el.addEventListener("mousedown",start);
+el.addEventListener("touchstart",start,{passive:false});
+})();
+
+if("scrollRestoration" in history)history.scrollRestoration="manual";
+
+window.onload=async()=>{
+  window.scrollTo(0,0);
+  renderTabs();
+  await loadShippingSettings();
+  updateCartUI();
+  await switchTab(currentTab);
+  window.scrollTo(0,0);
+};
+</script>
+
+<script>
+const PLAN_API="https://script.google.com/macros/s/AKfycbwCmtwlK88B8yK2imEUWub_ERY6FLMO0KbYFhfFW64ai5g4NLhizcKQRkUwjWYjvtZQlA/exec";
+
+let remotePlanCache={};
+
+
+/* =========================
+   基本
+========================= */
+
+function planApiReady(){
+  return /^https:\/\/script\.google\.com\/macros\/s\//.test(PLAN_API);
+}
+
+function planKey(c){
+  return `${currentTab}|${c}`;
+}
+
+function localPlanKey(key){
+  return `jiwu_remote_plan_${key}`;
+}
+
+function clearPlanCache(category){
+  const key=planKey(category);
+
+  delete remotePlanCache[key];
+
+  try{
+    localStorage.removeItem(
+      localPlanKey(key)
+    );
+  }catch{}
+}
+
+
+/* =========================
+   商品同步 ID
+========================= */
+
+function ensureSyncIds(){
+
+  const count={};
+
+  allItems.forEach(i=>{
+
+    /*
+      不再把網址、原價放進 ID
+      避免價格或網址改變後整份排單失效
+    */
+
+    const base=[
+      i.group,
+      i.sn,
+      i.name,
+      i.role,
+      i.source,
+      i.customer
+    ]
+    .map(norm)
+    .join("¦");
+
+    const n=
+      count[base]=
+        (count[base]||0)+1;
+
+    i.__planId=
+      `${base}#${n}`;
+
+  });
+
+}
+
+function itemSyncId(i){
+  return i.__planId||"";
+}
+
+
+/* =========================
+   多訂卡
+========================= */
+
+const EXTRA_MARK="::EXTRA::";
+
+function baseSyncId(id){
+
+  return String(id||"")
+    .split(EXTRA_MARK)[0];
+
+}
+
+
+/* =========================
+   JSONP 讀取 GAS
+========================= */
+
+function jsonp(url){
+
+  return new Promise(
+    (resolve,reject)=>{
+
+      const cb=
+        `__plan_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      const s=
+        document.createElement(
+          "script"
+        );
+
+
+      function done(){
+
+        delete window[cb];
+
+        s.remove();
+
+      }
+
+
+      window[cb]=data=>{
+
+        done();
+
+        resolve(data);
+
+      };
+
+
+      s.onerror=()=>{
+
+        done();
+
+        reject(
+          new Error(
+            "同步讀取失敗"
+          )
+        );
+
+      };
+
+
+      s.src=
+        `${url}${url.includes("?")?"&":"?"}callback=${cb}`;
+
+
+      document.head
+        .appendChild(s);
+
+    }
+  );
+
+}
+
+
+/* =========================
+   讀取排單
+========================= */
+
+async function loadPlanRemote(
+  category,
+  force=false
+){
+
+  if(!planApiReady()){
+    return null;
+  }
+
+
+  const key=
+    planKey(category);
+
+
+  if(
+    !force&&
+    remotePlanCache[key]
+  ){
+
+    return remotePlanCache[key];
+
+  }
+
+
+  /*
+    先讀本機
+  */
+
+  let local=null;
+
+  try{
+
+    local=
+      JSON.parse(
+        localStorage
+          .getItem(
+            localPlanKey(key)
+          )||"null"
+      );
+
+  }catch{}
+
+
+  /*
+    再讀試算表
+  */
+
+  let remote=null;
+
+  try{
+
+    const data=
+      await jsonp(
+        `${PLAN_API}?action=loadPlan&key=${encodeURIComponent(key)}&_=${Date.now()}`
+      );
+
+
+    if(
+      data?.ok&&
+      data.found
+    ){
+
+      remote=data;
+
+    }
+
+  }catch(e){
+
+    console.warn(
+      "排單同步讀取失敗",
+      e
+    );
+
+  }
+
+
+  /*
+    本機排單比較新
+    → 使用本機
+  */
+
+  if(local){
+
+    const localTime=
+      Number(
+        local.savedAt
+      )||0;
+
+
+    const remoteTime=
+      remote?.updatedAt
+        ?new Date(
+            remote.updatedAt
+          ).getTime()
+        :0;
+
+
+    /*
+      舊版本沒有 savedAt
+      第一次升級先保留本機排單
+    */
+
+    if(
+      !remote||
+      !local.savedAt||
+      localTime>=remoteTime
+    ){
+
+      if(!local.savedAt){
+
+        local.savedAt=
+          Date.now();
+
+      }
+
+      remotePlanCache[key]=
+        local;
+
+
+      return local;
+
+    }
+
+  }
+
+
+  /*
+    試算表比較新
+    → 使用試算表
+  */
+
+  if(remote){
+
+    const remoteTime=
+      remote.updatedAt
+        ?new Date(
+            remote.updatedAt
+          ).getTime()
+        :Date.now();
+
+
+    const cachedRemote={
+
+      ...remote,
+
+      savedAt:
+        Number.isFinite(
+          remoteTime
+        )
+          ?remoteTime
+          :Date.now()
+
+    };
+
+
+    remotePlanCache[key]=
+      cachedRemote;
+
+
+    try{
+
+      localStorage.setItem(
+        localPlanKey(key),
+        JSON.stringify(
+          cachedRemote
+        )
+      );
+
+    }catch{}
+
+
+    return cachedRemote;
+
+  }
+
+
+  return null;
+
+}
+
+
+/* =========================
+   儲存排單
+========================= */
+
+function savePlanRemote(
+  category,
+  cars,
+  limit
+){
+
+  if(!planApiReady()){
+    return;
+  }
+
+
+  const key=
+    planKey(category);
+
+
+  const body={
+
+    action:"savePlan",
+
+    key,
+
+    group:
+      category,
+
+    limit:
+      String(
+        limit||""
+      ),
+
+    cars:
+      cars.map(
+        c=>
+          c.items.map(
+            itemSyncId
+          )
+      )
+
+  };
+
+
+  const cache={
+
+    ok:true,
+
+    found:true,
+
+    key,
+
+    group:
+      category,
+
+    limit:
+      String(
+        limit||""
+      ),
+
+    cars:
+      body.cars,
+
+    savedAt:
+      Date.now()
+
+  };
+
+
+  /*
+    先立即存瀏覽器
+    拖完就存
+  */
+
+  remotePlanCache[key]=
+    cache;
+
+
+  try{
+
+    localStorage.setItem(
+      localPlanKey(key),
+      JSON.stringify(
+        cache
+      )
+    );
+
+  }catch{}
+
+
+  /*
+    再同步 GAS
+  */
+
+  const raw=
+    JSON.stringify(
+      body
+    );
+
+
+  const blob=
+    new Blob(
+      [raw],
+      {
+        type:
+          "text/plain;charset=utf-8"
+      }
+    );
+
+
+  /*
+    優先用 sendBeacon
+    刷新頁面時也比較不容易中斷
+  */
+
+  if(
+    navigator.sendBeacon
+  ){
+
+    try{
+
+      if(
+        navigator.sendBeacon(
+          PLAN_API,
+          blob
+        )
+      ){
+
+        return;
+
+      }
+
+    }catch{}
+
+  }
+
+
+  fetch(
+    PLAN_API,
+    {
+
+      method:"POST",
+
+      headers:{
+        "Content-Type":
+          "text/plain;charset=utf-8"
+      },
+
+      body:
+        raw,
+
+      mode:
+        "no-cors",
+
+      keepalive:
+        true
+
+    }
+  )
+  .catch(
+    e=>
+      console.warn(
+        "排單同步儲存失敗",
+        e
+      )
+  );
+
+}
+
+
+/* =========================
+   刪除排單
+========================= */
+
+function deletePlanRemote(
+  category
+){
+
+  if(!planApiReady()){
+    return;
+  }
+
+
+  const key=
+    planKey(category);
+
+
+  delete remotePlanCache[key];
+
+
+  try{
+
+    localStorage.removeItem(
+      localPlanKey(key)
+    );
+
+  }catch{}
+
+
+  const raw=
+    JSON.stringify({
+
+      action:
+        "deletePlan",
+
+      key
+
+    });
+
+
+  const blob=
+    new Blob(
+      [raw],
+      {
+        type:
+          "text/plain;charset=utf-8"
+      }
+    );
+
+
+  if(
+    navigator.sendBeacon
+  ){
+
+    try{
+
+      if(
+        navigator.sendBeacon(
+          PLAN_API,
+          blob
+        )
+      ){
+
+        return;
+
+      }
+
+    }catch{}
+
+  }
+
+
+  fetch(
+    PLAN_API,
+    {
+
+      method:"POST",
+
+      headers:{
+        "Content-Type":
+          "text/plain;charset=utf-8"
+      },
+
+      body:
+        raw,
+
+      mode:
+        "no-cors",
+
+      keepalive:
+        true
+
+    }
+  )
+  .catch(()=>{});
+
+}
+
+
+/* =========================
+   舊 ID 解析
+========================= */
+
+function savedPlanParts(
+  savedId
+){
+
+  let s=
+    baseSyncId(
+      savedId
+    )
+    .replace(
+      /#\d+$/,
+      ""
+    );
+
+
+  const p=
+    s.split("¦");
+
+
+  return{
+
+    group:
+      norm(p[0]),
+
+    sn:
+      norm(p[1]),
+
+    name:
+      norm(p[2]),
+
+    role:
+      norm(p[3]),
+
+    source:
+      norm(p[4]),
+
+    customer:
+      norm(p[5])
+
+  };
+
+}
+
+
+/* =========================
+   找回原商品
+========================= */
+
+function findSavedItem(
+  savedId,
+  items,
+  used
+){
+
+  const raw=
+    baseSyncId(
+      savedId
+    );
+
+
+  /*
+    第一優先：
+    ID 完全相同
+  */
+
+  let item=
+    items.find(
+      i=>
+
+        !used.has(i)&&
+
+        itemSyncId(i)===
+          raw
+    );
+
+
+  if(item){
+    return item;
+  }
+
+
+  /*
+    舊 ID 不一致
+    用商品資料重新比對
+  */
+
+  const x=
+    savedPlanParts(
+      raw
+    );
+
+
+  item=
+    items.find(
+      i=>{
+
+        if(
+          used.has(i)
+        ){
+          return false;
+        }
+
+
+        if(
+          x.group&&
+          norm(i.group)!==
+            x.group
+        ){
+
+          return false;
+
+        }
+
+
+        /*
+          有貨號優先貨號
+        */
+
+        if(x.sn){
+
+          if(
+            norm(i.sn)!==
+              x.sn
+          ){
+
+            return false;
+
+          }
+
+        }else{
+
+          if(
+            norm(i.name)!==
+              x.name
+          ){
+
+            return false;
+
+          }
+
+
+          if(
+            x.role&&
+            norm(i.role)!==
+              x.role
+          ){
+
+            return false;
+
+          }
+
+        }
+
+
+        /*
+          同商品不同客人
+          仍要分開
+        */
+
+        if(
+          x.source&&
+          norm(i.source)!==
+            x.source
+        ){
+
+          return false;
+
+        }
+
+
+        if(
+          x.customer&&
+          norm(i.customer)!==
+            x.customer
+        ){
+
+          return false;
+
+        }
+
+
+        return true;
+
+      }
+    );
+
+
+  return item||null;
+
+}
+
+
+/* =========================
+   重算車
+========================= */
+
+function recalcRestoredCar(
+  car
+){
+
+  car.total=
+    car.items.reduce(
+      (sum,i)=>
+        sum+
+        yen(
+          i.originalPrice
+        ),
+      0
+    );
+
+
+  car.counts={};
+
+
+  car.items.forEach(
+    i=>{
+
+      const key=
+        itemOrderKey(i);
+
+
+      car.counts[key]=
+        (car.counts[key]||0)+1;
+
+    }
+  );
+
+}
+
+
+/* =========================
+   安全還原排單
+========================= */
+
+function restoreCarsSafely(
+  items,
+  plan,
+  dollLimit
+){
+
+  const cars=[];
+
+  const used=
+    new Set();
+
+
+  /*
+    先完全照舊車序還原
+  */
+
+  (plan?.cars||[])
+    .forEach(
+      ids=>{
+
+        const list=[];
+
+
+        (ids||[])
+          .forEach(
+            savedId=>{
+
+              const raw=
+                String(
+                  savedId||""
+                );
+
+
+              /*
+                多訂卡
+              */
+
+              if(
+                raw.includes(
+                  EXTRA_MARK
+                )
+              ){
+
+                const baseItem=
+                  findSavedItem(
+                    baseSyncId(
+                      raw
+                    ),
+                    items,
+                    new Set()
+                  );
+
+
+                if(baseItem){
+
+                  list.push({
+
+                    ...baseItem,
+
+                    /*
+                      多訂品不屬於客人
+                    */
+
+                    source:"",
+                    customer:"",
+
+                    __planId:
+                      raw,
+
+                    __extra:
+                      true
+
+                  });
+
+                }
+
+
+                return;
+
+              }
+
+
+              /*
+                原本商品
+              */
+
+              const item=
+                findSavedItem(
+                  raw,
+                  items,
+                  used
+                );
+
+
+              if(item){
+
+                used.add(
+                  item
+                );
+
+
+                list.push(
+                  item
+                );
+
+              }
+
+            }
+          );
+
+
+        /*
+          空車不用留
+        */
+
+        if(
+          list.length
+        ){
+
+          const car={
+
+            items:
+              list,
+
+            total:
+              0,
+
+            counts:{}
+
+          };
+
+
+          recalcRestoredCar(
+            car
+          );
+
+
+          cars.push(
+            car
+          );
+
+        }
+
+      }
+    );
+
+
+  /*
+    找出新增加的商品
+  */
+
+  const newItems=
+    items.filter(
+      i=>
+        !used.has(i)
+    );
+
+
+  /*
+    新商品才補進現有排單
+    舊商品完全不搬
+  */
+
+  newItems.forEach(
+    item=>{
+
+      const key=
+        itemOrderKey(
+          item
+        );
+
+
+      const limit=
+        itemCartLimit(
+          item,
+          dollLimit
+        );
+
+
+      const choices=
+        cars
+          .map(
+            (car,n)=>({
+
+              car,
+
+              n,
+
+              count:
+                car.items
+                  .filter(
+                    x=>
+                      itemOrderKey(x)===
+                      key
+                  )
+                  .length
+
+            })
+          )
+          .filter(
+            x=>
+
+              !Number.isFinite(
+                limit
+              )||
+
+              x.count<
+                limit
+          );
+
+
+      /*
+        找得到可放的車
+      */
+
+      if(
+        choices.length
+      ){
+
+        choices.sort(
+          (a,b)=>
+            a.car.total-
+            b.car.total
+        );
+
+
+        const target=
+          choices[0].car;
+
+
+        target.items
+          .push(
+            item
+          );
+
+
+        recalcRestoredCar(
+          target
+        );
+
+      }else{
+
+        /*
+          都已經達限購
+          → 新增一車
+        */
+
+        const newCar={
+
+          items:[
+            item
+          ],
+
+          total:0,
+
+          counts:{}
+
+        };
+
+
+        recalcRestoredCar(
+          newCar
+        );
+
+
+        cars.push(
+          newCar
+        );
+
+      }
+
+    }
+  );
+
+
+  /*
+    完全沒有可還原資料
+    才重新自動排
+  */
+
+  if(
+    !cars.length&&
+    items.length
+  ){
+
+    return makeOrderPlan(
+      items,
+      dollLimit
+    );
+
+  }
+
+
+  return cars;
+
+}
+
+
+/* =========================
+   讀取每團限購數量
+========================= */
+
+async function loadSyncedOrderLimits(){
+
+  if(
+    ![
+      "pending",
+      "latest",
+      "reminder"
+    ].includes(
+      currentTab
+    )||
+    !planApiReady()
+  ){
+
+    return;
+
+  }
+
+
+  ensureSyncIds();
+
+
+  await Promise.all(
+
+    allCategories.map(
+      async category=>{
+
+        const plan=
+          await loadPlanRemote(
+            category
+          );
+
+
+        if(
+          plan&&
+          ["1","2"]
+            .includes(
+              String(
+                plan.limit
+              )
+            )
+        ){
+
+          orderLimits[category]=
+            String(
+              plan.limit
+            );
+
+        }
+
+      }
+    )
+
+  );
+
+}
+
+
+/* =========================
+   切換頁面
+========================= */
+
+const __originalSwitchTab=
+  switchTab;
+
+
+switchTab=
+async function(key){
+
+  /*
+    避免上一頁舊限購設定
+    先觸發一次舊排單
+  */
+
+  if(
+    [
+      "pending",
+      "latest",
+      "reminder"
+    ].includes(key)
+  ){
+
+    orderLimits={};
+
+  }
+
+
+  await __originalSwitchTab(
+    key
+  );
+
+
+  if(
+    ![
+      "pending",
+      "latest",
+      "reminder"
+    ].includes(
+      currentTab
+    )
+  ){
+
+    return;
+
+  }
+
+
+  remotePlanCache={};
+
+
+  ensureSyncIds();
+
+
+  await loadSyncedOrderLimits();
+
+
+  renderItems();
+
+
+  requestAnimationFrame(
+    ()=>{
+
+      document
+        .getElementById(
+          "card-container"
+        )
+        .style
+        .paddingTop=
+
+          40+
+
+          document
+            .querySelector(
+              ".header-fixed"
+            )
+            .offsetHeight+
+
+          "px";
+
+    }
+  );
+
+};
+
+
+/* =========================
+   限購確認
+========================= */
+
+document.addEventListener(
+  "click",
+  e=>{
+
+    if(
+      !e.target
+        .classList
+        ?.contains(
+          "order-limit-confirm"
+        )
+    ){
+
+      return;
+
+    }
+
+
+    const divider=
+      e.target.closest(
+        ".type-divider"
+      );
+
+
+    const category=
+      divider
+        ?.querySelector(
+          "span"
+        )
+        ?.textContent
+        ?.trim();
+
+
+    const value=
+      divider
+        ?.querySelector(
+          ".order-limit-input"
+        )
+        ?.value
+        ?.trim();
+
+
+    if(!category){
+      return;
+    }
+
+
+    const oldValue=
+      String(
+        orderLimits[
+          category
+        ]||""
+      );
+
+
+    /*
+      清空數字
+      → 清除這團排單
+    */
+
+    if(!value){
+
+      deletePlanRemote(
+        category
+      );
+
+      return;
+
+    }
+
+
+    /*
+      只有真的從 1 改 2
+      或 2 改 1
+      才清掉快取
+
+      同樣數字再按確認
+      不會破壞排單
+    */
+
+    if(
+      oldValue&&
+      oldValue!==value
+    ){
+
+      clearPlanCache(
+        category
+      );
+
+    }
+
+  },
+  true
+);
+
+
+/* =========================
+   排單主程式
+========================= */
+
+renderOrderPlan=
+async function(
+  target,
+  items,
+  dollLimit,
+  card
+){
+
+  ensureSyncIds();
+
+
+  const category=
+    target
+      .previousElementSibling
+      ?.querySelector(
+        "span"
+      )
+      ?.textContent
+      ?.trim()||"";
+
+
+  target.innerHTML=
+    "<div style='font-size:11px;color:#999;padding:8px'>同步排單中...</div>";
+
+
+  const saved=
+    await loadPlanRemote(
+      category
+    );
+
+
+  let cars;
+
+
+  /*
+    有已儲存排單
+    ＋ 限購數量相同
+
+    → 永遠沿用舊排單
+  */
+
+  if(
+    saved&&
+    Array.isArray(
+      saved.cars
+    )&&
+    saved.cars.length&&
+    String(
+      saved.limit
+    )===
+    String(
+      dollLimit
+    )
+  ){
+
+    cars=
+      restoreCarsSafely(
+        items,
+        saved,
+        dollLimit
+      );
+
+  }else{
+
+    /*
+      第一次排
+      或限購數量真的修改
+
+      才自動重新排
+    */
+
+    cars=
+      makeOrderPlan(
+        items,
+        dollLimit
+      );
+
+  }
+
+
+  if(
+    !target.isConnected
+  ){
+
+    return;
+
+  }
+
+
+  /*
+    還原完立即存一次
+    新商品補進去後
+    試算表也同步更新
+  */
+
+  savePlanRemote(
+    category,
+    cars,
+    dollLimit
+  );
+
+
+  let dragging=null;
+
+
+/* =========================
+   重算單車
+========================= */
+
+  function recalcCar(
+    car
+  ){
+
+    car.total=
+      car.items.reduce(
+        (sum,i)=>
+          sum+
+          yen(
+            i.originalPrice
+          ),
+        0
+      );
+
+
+    car.counts={};
+
+
+    car.items.forEach(
+      i=>{
+
+        const key=
+          itemOrderKey(i);
+
+
+        car.counts[key]=
+          (car.counts[key]||0)+1;
+
+      }
+    );
+
+  }
+
+
+  function save(){
+
+    savePlanRemote(
+      category,
+      cars,
+      dollLimit
+    );
+
+  }
+
+
+/* =========================
+   建立多訂卡
+========================= */
+
+  function makeExtra(
+    item
+  ){
+
+    const base=
+      baseSyncId(
+        itemSyncId(
+          item
+        )
+      );
+
+
+    return{
+
+      ...item,
+
+      /*
+        多訂不屬於客人
+      */
+
+      source:"",
+      customer:"",
+
+
+      /*
+        多訂卡唯一 ID
+      */
+
+      __planId:
+        `${base}${EXTRA_MARK}${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+
+
+      /*
+        已訂購清單
+        寫到「多」
+      */
+
+      __extra:
+        true
+
+    };
+
+  }
+
+
+/* =========================
+   ＋1
+========================= */
+
+  function duplicateItem(
+    item,
+    from
+  ){
+
+    const copy=
+      makeExtra(
+        item
+      );
+
+
+    const key=
+      itemOrderKey(
+        copy
+      );
+
+
+    const limit=
+      itemCartLimit(
+        copy,
+        dollLimit
+      );
+
+
+    /*
+      找目前還能放
+      這個商品的車
+    */
+
+    const choices=
+      cars
+        .map(
+          (car,n)=>({
+
+            n,
+
+            car,
+
+            count:
+              car.items
+                .filter(
+                  x=>
+                    itemOrderKey(x)===
+                    key
+                )
+                .length
+
+          })
+        )
+        .filter(
+          x=>
+
+            !Number.isFinite(
+              limit
+            )||
+
+            x.count<
+              limit
+        );
+
+
+    let to;
+
+
+    /*
+      原車還能放
+      優先原車
+    */
+
+    if(
+      choices.length
+    ){
+
+      choices.sort(
+        (a,b)=>{
+
+          if(
+            a.n===from&&
+            b.n!==from
+          ){
+
+            return -1;
+
+          }
+
+
+          if(
+            b.n===from&&
+            a.n!==from
+          ){
+
+            return 1;
+
+          }
+
+
+          return(
+            a.car.total-
+            b.car.total
+          );
+
+        }
+      );
+
+
+      to=
+        choices[0].n;
+
+    }
+
+
+    /*
+      所有車都達限購
+      → 新開一車
+    */
+
+    if(
+      to===undefined
+    ){
+
+      const newCar={
+
+        items:[
+          copy
+        ],
+
+        total:0,
+
+        counts:{}
+
+      };
+
+
+      recalcCar(
+        newCar
+      );
+
+
+      cars.push(
+        newCar
+      );
+
+    }else{
+
+      cars[to]
+        .items
+        .push(
+          copy
+        );
+
+
+      recalcCar(
+        cars[to]
+      );
+
+    }
+
+
+    save();
+
+
+    renderCars();
+
+  }
+
+
+/* =========================
+   刪除多訂
+========================= */
+
+  function removeExtra(
+    item,
+    carIndex
+  ){
+
+    if(
+      !item.__extra
+    ){
+
+      return;
+
+    }
+
+
+    const car=
+      cars[
+        carIndex
+      ];
+
+
+    if(!car){
+      return;
+    }
+
+
+    const idx=
+      car.items
+        .indexOf(
+          item
+        );
+
+
+    if(idx<0){
+      return;
+    }
+
+
+    car.items.splice(
+      idx,
+      1
+    );
+
+
+    /*
+      整車空了
+      → 刪掉這車
+    */
+
+    if(
+      !car.items.length
+    ){
+
+      cars.splice(
+        carIndex,
+        1
+      );
+
+    }else{
+
+      recalcCar(
+        car
+      );
+
+    }
+
+
+    save();
+
+
+    renderCars();
+
+  }
+
+
+/* =========================
+   商品拖曳
+========================= */
+
+  function makeDraggable(
+    el,
+    item,
+    carIndex
+  ){
+
+    el.draggable=
+      true;
+
+
+    el.__orderItem=
+      item;
+
+
+    el.__carIndex=
+      carIndex;
+
+
+    el.addEventListener(
+      "dragstart",
+      e=>{
+
+        /*
+          點 ＋1 或 ×
+          不開始拖曳
+        */
+
+        if(
+          e.target.closest(
+            ".plan-copy-btn,.plan-remove-btn"
+          )
+        ){
+
+          e.preventDefault();
+
+          return;
+
+        }
+
+
+        dragging={
+
+          el,
+
+          item,
+
+          from:
+            el.__carIndex
+
+        };
+
+
+        el.classList.add(
+          "dragging"
+        );
+
+
+        e.dataTransfer
+          .effectAllowed=
+          "move";
+
+
+        try{
+
+          e.dataTransfer
+            .setData(
+              "text/plain",
+              itemOrderKey(
+                item
+              )
+            );
+
+        }catch{}
+
+      }
+    );
+
+
+    el.addEventListener(
+      "dragend",
+      ()=>{
+
+        el.classList.remove(
+          "dragging"
+        );
+
+
+        target
+          .querySelectorAll(
+            ".drag-over"
+          )
+          .forEach(
+            x=>
+              x.classList.remove(
+                "drag-over"
+              )
+          );
+
+
+        dragging=null;
+
+      }
+    );
+
+  }
+
+
+/* =========================
+   拖到其他車
+========================= */
+
+  function moveToCar(
+    from,
+    to,
+    item
+  ){
+
+    if(
+      from===to
+    ){
+
+      return;
+
+    }
+
+
+    const key=
+      itemOrderKey(
+        item
+      );
+
+
+    const limit=
+      itemCartLimit(
+        item,
+        dollLimit
+      );
+
+
+    const current=
+      cars[to]
+        .items
+        .filter(
+          x=>
+            itemOrderKey(x)===
+            key
+        )
+        .length;
+
+
+    if(
+      Number.isFinite(
+        limit
+      )&&
+      current>=limit
+    ){
+
+      alert(
+        `娃類商品這一車最多只能放 ${limit} 個`
+      );
+
+      return;
+
+    }
+
+
+    const idx=
+      cars[from]
+        .items
+        .indexOf(
+          item
+        );
+
+
+    if(idx<0){
+      return;
+    }
+
+
+    cars[from]
+      .items
+      .splice(
+        idx,
+        1
+      );
+
+
+    cars[to]
+      .items
+      .push(
+        item
+      );
+
+
+    recalcCar(
+      cars[from]
+    );
+
+
+    recalcCar(
+      cars[to]
+    );
+
+
+    /*
+      原車搬空
+      → 刪掉
+    */
+
+    if(
+      !cars[from]
+        .items
+        .length
+    ){
+
+      cars.splice(
+        from,
+        1
+      );
+
+    }
+
+
+    save();
+
+
+    renderCars();
+
+  }
+
+
+/* =========================
+   拖到底部新增一車
+========================= */
+
+  function addNewCar(
+    from,
+    item
+  ){
+
+    const idx=
+      cars[from]
+        ?.items
+        .indexOf(
+          item
+        );
+
+
+    if(idx<0){
+      return;
+    }
+
+
+    cars[from]
+      .items
+      .splice(
+        idx,
+        1
+      );
+
+
+    recalcCar(
+      cars[from]
+    );
+
+
+    const newCar={
+
+      items:[
+        item
+      ],
+
+      total:0,
+
+      counts:{}
+
+    };
+
+
+    recalcCar(
+      newCar
+    );
+
+
+    if(
+      !cars[from]
+        .items
+        .length
+    ){
+
+      cars.splice(
+        from,
+        1
+      );
+
+    }
+
+
+    cars.push(
+      newCar
+    );
+
+
+    save();
+
+
+    renderCars();
+
+  }
+
+
+/* =========================
+   畫一車
+========================= */
+
+  function createCarRow(
+    car,
+    n
+  ){
+
+    const row=
+      document.createElement(
+        "div"
+      );
+
+
+    row.className=
+      "auto-order-row";
+
+
+    row.dataset.car=
+      n;
+
+
+    const ok=
+      car.total>=
+      ORDER_TARGET;
+
+
+    row.innerHTML=`
+
+      <div class="auto-order-no">
+        ${n+1}
+      </div>
+
+      <div class="auto-order-main">
+
+        <div class="auto-order-meta">
+
+          <span class="auto-order-count">
+            ${car.items.length}件
+          </span>
+
+          <span class="auto-order-total">
+            ¥${fmt(car.total)}
+          </span>
+
+          <span
+            class="auto-order-status ${
+              ok
+                ?"auto-order-ok"
+                :"auto-order-warn"
+            }">
+
+            ${
+              ok
+                ?"✓ 已滿 ¥11,000"
+                :`差 ¥${fmt(
+                    ORDER_TARGET-
+                    car.total
+                  )}`
+            }
+
+          </span>
+
+        </div>
+
+        <div
+          class="auto-order-grid"
+          data-car="${n}">
+        </div>
+
+      </div>
+
+      <button class="auto-order-add">
+        ＋
+      </button>
+
+    `;
+
+
+    const grid=
+      row.querySelector(
+        ".auto-order-grid"
+      );
+
+
+    car.items.forEach(
+      i=>{
+
+        const el=
+          card(i);
+
+
+        /*
+          多訂卡
+        */
+
+        if(
+          i.__extra
+        ){
+
+          el.classList.add(
+            "plan-extra"
+          );
+
+
+          const label=
+            document.createElement(
+              "div"
+            );
+
+
+          label.className=
+            "plan-extra-label";
+
+
+          label.textContent=
+            "多";
+
+
+          el.appendChild(
+            label
+          );
+
+        }
+
+
+        /*
+          ＋1
+        */
+
+        const copy=
+          document.createElement(
+            "button"
+          );
+
+
+        copy.className=
+          "plan-copy-btn";
+
+
+        copy.textContent=
+          "＋1";
+
+
+        copy.title=
+          "多訂一個";
+
+
+        copy.onmousedown=
+        copy.ontouchstart=
+          e=>{
+
+            e.stopPropagation();
+
+          };
+
+
+        copy.onclick=
+          e=>{
+
+            e.stopPropagation();
+
+
+            duplicateItem(
+              i,
+              n
+            );
+
+          };
+
+
+        el.appendChild(
+          copy
+        );
+
+
+        /*
+          多訂卡刪除鈕
+        */
+
+        if(
+          i.__extra
+        ){
+
+          const del=
+            document.createElement(
+              "button"
+            );
+
+
+          del.className=
+            "plan-remove-btn";
+
+
+          del.textContent=
+            "×";
+
+
+          del.title=
+            "刪除多訂";
+
+
+          del.onmousedown=
+          del.ontouchstart=
+            e=>{
+
+              e.stopPropagation();
+
+            };
+
+
+          del.onclick=
+            e=>{
+
+              e.stopPropagation();
+
+
+              removeExtra(
+                i,
+                n
+              );
+
+            };
+
+
+          el.appendChild(
+            del
+          );
+
+        }
+
+
+        makeDraggable(
+          el,
+          i,
+          n
+        );
+
+
+        grid.appendChild(
+          el
+        );
+
+      }
+    );
+
+
+    /*
+      拖進這車
+    */
+
+    grid.addEventListener(
+      "dragover",
+      e=>{
+
+        e.preventDefault();
+
+
+        if(
+          dragging&&
+          dragging.from!==n
+        ){
+
+          grid.classList.add(
+            "drag-over"
+          );
+
+
+          e.dataTransfer
+            .dropEffect=
+            "move";
+
+        }
+
+      }
+    );
+
+
+    grid.addEventListener(
+      "dragleave",
+      e=>{
+
+        if(
+          !grid.contains(
+            e.relatedTarget
+          )
+        ){
+
+          grid.classList.remove(
+            "drag-over"
+          );
+
+        }
+
+      }
+    );
+
+
+    grid.addEventListener(
+      "drop",
+      e=>{
+
+        e.preventDefault();
+
+
+        grid.classList.remove(
+          "drag-over"
+        );
+
+
+        if(
+          !dragging||
+          dragging.from===n
+        ){
+
+          return;
+
+        }
+
+
+        const {
+          from,
+          item
+        }=
+          dragging;
+
+
+        dragging=
+          null;
+
+
+        moveToCar(
+          from,
+          n,
+          item
+        );
+
+      }
+    );
+
+
+    /*
+      右邊 ＋
+      整車加入購物車
+    */
+
+    row
+      .querySelector(
+        ".auto-order-add"
+      )
+      .onclick=
+        e=>
+          addPlannedCart(
+            car.items,
+            e.currentTarget
+          );
+
+
+    return row;
+
+  }
+
+
+/* =========================
+   最下面新增車
+========================= */
+
+  function createManualDrop(){
+
+    const drop=
+      document.createElement(
+        "div"
+      );
+
+
+    drop.className=
+      "manual-car-drop";
+
+
+    drop.textContent=
+      "＋ 拖曳商品到這裡增加一車";
+
+
+    drop.addEventListener(
+      "dragover",
+      e=>{
+
+        e.preventDefault();
+
+
+        if(
+          dragging
+        ){
+
+          drop.classList.add(
+            "drag-over"
+          );
+
+
+          e.dataTransfer
+            .dropEffect=
+            "move";
+
+        }
+
+      }
+    );
+
+
+    drop.addEventListener(
+      "dragleave",
+      e=>{
+
+        if(
+          !drop.contains(
+            e.relatedTarget
+          )
+        ){
+
+          drop.classList.remove(
+            "drag-over"
+          );
+
+        }
+
+      }
+    );
+
+
+    drop.addEventListener(
+      "drop",
+      e=>{
+
+        e.preventDefault();
+
+
+        drop.classList.remove(
+          "drag-over"
+        );
+
+
+        if(
+          !dragging
+        ){
+
+          return;
+
+        }
+
+
+        const {
+          from,
+          item
+        }=
+          dragging;
+
+
+        dragging=
+          null;
+
+
+        addNewCar(
+          from,
+          item
+        );
+
+      }
+    );
+
+
+    return drop;
+
+  }
+
+
+/* =========================
+   重畫全部車
+========================= */
+
+  function renderCars(){
+
+    target.innerHTML="";
+
+
+    cars.forEach(
+      recalcCar
+    );
+
+
+    cars.forEach(
+      (car,n)=>{
+
+        target.appendChild(
+          createCarRow(
+            car,
+            n
+          )
+        );
+
+      }
+    );
+
+
+    target.appendChild(
+      createManualDrop()
+    );
+
+  }
+
+
+  renderCars();
+
+};
+
 </script>
 </body>
 </html>

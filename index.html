@@ -604,6 +604,18 @@ target.innerHTML="";
 const cars=makeOrderPlan(items,dollLimit);
 let dragging=null;
 
+/* 拖曳商品時允許滑鼠滾輪捲動頁面 */
+function dragWheelScroll(e){
+  if(!dragging)return;
+
+  e.preventDefault();
+
+  window.scrollBy({
+    top:e.deltaY,
+    left:0,
+    behavior:"auto"
+  });
+}
 function recalcCar(c){
 c.total=c.items.reduce((s,i)=>s+yen(i.originalPrice),0);
 c.counts={};
@@ -620,21 +632,89 @@ st.className=`auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}`;
 st.textContent=ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`;
 }
 
-function makeDraggable(el,item,carIndex){
-el.draggable=true;
-el.__orderItem=item;
-el.__carIndex=carIndex;
-el.addEventListener("dragstart",e=>{
-dragging={el,item,from:el.__carIndex};
-el.classList.add("dragging");
-e.dataTransfer.effectAllowed="move";
-try{e.dataTransfer.setData("text/plain",itemOrderKey(item))}catch{}
-});
-el.addEventListener("dragend",()=>{
-el.classList.remove("dragging");
-target.querySelectorAll(".auto-order-grid.drag-over").forEach(g=>g.classList.remove("drag-over"));
-dragging=null;
-});
+function makeDraggable(
+  el,
+  item,
+  carIndex
+){
+
+  el.draggable=true;
+
+  el.__orderItem=item;
+  el.__carIndex=carIndex;
+
+  el.addEventListener(
+    "dragstart",
+    e=>{
+
+      /* 點 ＋1 或 × 不開始拖曳 */
+      if(
+        e.target.closest(
+          ".plan-copy-btn,.plan-remove-btn"
+        )
+      ){
+        e.preventDefault();
+        return;
+      }
+
+      dragging={
+        el,
+        item,
+        from:el.__carIndex
+      };
+
+      el.classList.add(
+        "dragging"
+      );
+
+      e.dataTransfer.effectAllowed=
+        "move";
+
+      try{
+        e.dataTransfer.setData(
+          "text/plain",
+          itemOrderKey(item)
+        );
+      }catch{}
+
+      /* ★ 拖曳期間啟用滾輪捲動 */
+      window.addEventListener(
+        "wheel",
+        dragWheelScroll,
+        {passive:false}
+      );
+    }
+  );
+
+  el.addEventListener(
+    "dragend",
+    ()=>{
+
+      el.classList.remove(
+        "dragging"
+      );
+
+      target
+        .querySelectorAll(
+          ".drag-over"
+        )
+        .forEach(
+          x=>
+            x.classList.remove(
+              "drag-over"
+            )
+        );
+
+      /* ★ 停止拖曳後取消監聽 */
+      window.removeEventListener(
+        "wheel",
+        dragWheelScroll
+      );
+
+      dragging=null;
+    }
+  );
+
 }
 
 cars.forEach((c,n)=>{
@@ -2697,6 +2777,20 @@ async function(
   let dragging=null;
 
 
+  /* 拖曳商品時允許滑鼠滾輪捲動頁面 */
+  function dragWheelScroll(e){
+    if(!dragging)return;
+
+    e.preventDefault();
+
+    window.scrollBy({
+      top:e.deltaY,
+      left:0,
+      behavior:"auto"
+    });
+  }
+
+
 /* =========================
    重算單車
 ========================= */
@@ -3121,6 +3215,14 @@ async function(
 
         }catch{}
 
+
+        /* 拖曳期間啟用滾輪捲動 */
+        window.addEventListener(
+          "wheel",
+          dragWheelScroll,
+          {passive:false}
+        );
+
       }
     );
 
@@ -3144,6 +3246,13 @@ async function(
                 "drag-over"
               )
           );
+
+
+        /* 停止拖曳後取消滾輪監聽 */
+        window.removeEventListener(
+          "wheel",
+          dragWheelScroll
+        );
 
 
         dragging=null;

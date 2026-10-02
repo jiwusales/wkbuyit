@@ -766,7 +766,8 @@ function renderItems(){
           const planItems=a.filter(i=>!isTmall(i)&&!(statusMap.get(i)||""));
           const excludedItems=a.filter(i=>isTmall(i)||(statusMap.get(i)||""));
 
-          renderOrderPlan(plan,planItems,orderLimits[c],card);
+          // 還原舊排單時保留已訂購／缺貨商品；新商品仍只從 planItems 補入。
+          renderOrderPlan(plan,planItems,orderLimits[c],card,a.filter(i=>!isTmall(i)));
           if(excludedItems.length)grid(excludedItems);
           return;
         }
@@ -2046,7 +2047,8 @@ function recalcRestoredCar(
 function restoreCarsSafely(
   items,
   plan,
-  dollLimit
+  dollLimit,
+  savedItems=items
 ){
 
   const cars=[];
@@ -2091,7 +2093,7 @@ function restoreCarsSafely(
                     baseSyncId(
                       raw
                     ),
-                    items,
+                    savedItems,
                     new Set()
                   );
 
@@ -2132,7 +2134,7 @@ function restoreCarsSafely(
               const item=
                 findSavedItem(
                   raw,
-                  items,
+                  savedItems,
                   used
                 );
 
@@ -2597,7 +2599,8 @@ async function(
   target,
   items,
   dollLimit,
-  card
+  card,
+  savedItems=items
 ){
 
   ensureSyncIds();
@@ -2651,7 +2654,8 @@ async function(
       restoreCarsSafely(
         items,
         saved,
-        dollLimit
+        dollLimit,
+        savedItems
       );
 
   }else{

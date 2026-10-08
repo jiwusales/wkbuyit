@@ -111,6 +111,11 @@ body.latest-tab .nav-bar-wrapper .nav-arrow{display:none}
 body.latest-tab #role-scroll{overflow:visible;white-space:normal}
 body.latest-tab .nav-bar{display:flex;flex-wrap:wrap;justify-content:center;padding:0;white-space:normal}
 body.latest-tab .nav-bar a{padding:5px 3px}
+
+.visibility-toolbar{display:flex;align-items:center;justify-content:center;gap:8px;padding:5px;font-size:11px;border-top:1px solid #eee}
+.visibility-toolbar button,.group-hide-btn{background:#fff;border:1px solid var(--theme);color:var(--active);border-radius:6px;padding:3px 7px;font-size:10px;cursor:pointer}
+.card-hide-btn{display:block;margin:4px auto;padding:3px 7px;border:1px solid var(--theme);border-radius:5px;background:#fff;color:var(--active);font-size:9px;cursor:pointer;position:relative;z-index:25}
+.card.is-hidden{border-style:dashed;background:#f4f0f8}.type-divider.is-hidden{color:#999}
 </style>
 </head>
 <body>
@@ -121,6 +126,7 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 <div class="page-tabs-wrapper"><div class="nav-arrow" onclick="tabScroll.scrollBy(-180,0)">❮</div><div class="scroll-container" id="tab-scroll"><div class="page-tabs" id="page-tabs"></div></div><div class="nav-arrow" onclick="tabScroll.scrollBy(180,0)">❯</div></div>
 <div class="nav-bar-wrapper"><div class="nav-arrow" onclick="roleScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="role-scroll"><div class="nav-bar" id="dynamic-nav"></div></div><div class="nav-arrow" onclick="roleScroll.scrollBy(150,0)">❯</div></div>
 <div class="filter-bar-wrapper"><div class="nav-arrow" onclick="filterScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="filter-scroll"><div id="filter-bar"></div></div><div class="nav-arrow" onclick="filterScroll.scrollBy(150,0)">❯</div></div>
+<div class="visibility-toolbar"><button id="hidden-toggle" onclick="showHiddenItems=!showHiddenItems;renderItems()">隱藏區</button><span id="hidden-count"></span><span id="hidden-sync-status" role="status"></span></div>
 </div>
 
 <div id="card-container"><div id="items-wrapper"></div></div>
@@ -154,6 +160,89 @@ const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"�
 let savedTab=localStorage.getItem("jiwu_helper_tab");
 let currentTab=TABS[savedTab]?savedTab:"pending",allItems=[],allCategories=[],allTypes=[],selectedTypes=[],selectedRole=null,orderedCounts={},soldOutCounts={},cart=JSON.parse(localStorage.getItem("jiwu_helper_cart")||"[]"),sheetCache={},shippingSettings={},orderLimits={};
 const tabScroll=document.getElementById("tab-scroll"),roleScroll=document.getElementById("role-scroll"),filterScroll=document.getElementById("filter-scroll");
+
+// 隱藏僅影響顯示與加入購物車，不刪除商品或已儲存排單。
+const HIDDEN_STORAGE_KEY="jiwu_helper_hidden_v1";
+let hiddenState={cards:{},groups:{}},showHiddenItems=false;
+try{
+  const saved=JSON.parse(localStorage.getItem(HIDDEN_STORAGE_KEY)||"null");
+  if(saved&&saved.cards&&saved.groups)hiddenState=saved;
+}catch{}
+function hiddenGroupKey(category){return JSON.stringify([currentTab,category||""])}
+function hiddenCardKey(item){return JSON.stringify([currentTab,itemSyncId(item)||[item.group,item.sn,item.name,item.role,item.source,item.customer].map(norm).join("¦")])}
+function isCardHidden(item){return !!hiddenState.cards[hiddenCardKey(item)]}
+function isGroupHidden(category){return !!hiddenState.groups[hiddenGroupKey(category)]}
+function isItemHidden(item){return isCardHidden(item)||isGroupHidden(item.category)}
+const HIDDEN_REMOTE_KEY="__jiwu_shared_visibility_v1__";
+let hiddenSyncBusy=false,hiddenSyncMessage="",hiddenSyncQueue=Promise.resolve();
+function setHiddenSyncMessage(message){
+  hiddenSyncMessage=message;
+  document.getElementById("hidden-sync-status").textContent=message;
+}
+function cacheHiddenState(){
+  try{localStorage.setItem(HIDDEN_STORAGE_KEY,JSON.stringify(hiddenState))}catch{}
+}
+async function readSharedHiddenState(){
+  const data=await Promise.race([
+    jsonp(`${PLAN_API}?action=loadPlan&key=${encodeURIComponent(HIDDEN_REMOTE_KEY)}&_=${Date.now()}`),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error("同步逾時")),12000))
+  ]);
+  if(!data?.ok)throw new Error(data?.error||"無法讀取隱藏設定");
+  if(!data.found)return {cards:{},groups:{}};
+  if(!Array.isArray(data.cars)||data.cars.length!==2||!data.cars.every(row=>Array.isArray(row)&&row.every(key=>typeof key==="string")))throw new Error("雲端隱藏設定格式不符");
+  return {cards:Object.fromEntries(data.cars[0].map(key=>[key,true])),groups:Object.fromEntries(data.cars[1].map(key=>[key,true]))};
+}
+async function writeSharedHiddenState(state){
+  // 使用排單 API 的獨立紀錄，不改動各團排單。
+  await fetch(PLAN_API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"savePlan",key:HIDDEN_REMOTE_KEY,group:"隱藏區設定",limit:"1",cars:[Object.keys(state.cards),Object.keys(state.groups)]}),keepalive:true});
+}
+function toggleHiddenEntry(kind,key){
+  hiddenSyncQueue=hiddenSyncQueue.then(async()=>{
+    hiddenSyncBusy=true;
+    setHiddenSyncMessage("同步中…");
+    try{
+      const remote=await readSharedHiddenState();
+      const hiding=!remote[kind][key];
+      if(hiding)remote[kind][key]=true;else delete remote[kind][key];
+      await writeSharedHiddenState(remote);
+      let confirmed;
+      for(let attempt=0;attempt<4;attempt++){
+        confirmed=await readSharedHiddenState();
+        if(!!confirmed[kind][key]===hiding)break;
+        if(attempt===3)throw new Error("雲端尚未確認儲存，請稍後重試");
+        await new Promise(resolve=>setTimeout(resolve,1000));
+      }
+      hiddenState=confirmed;
+      cacheHiddenState();
+      setHiddenSyncMessage("已同步");
+      renderItems();
+    }catch(error){
+      setHiddenSyncMessage("同步失敗");
+      alert(`隱藏設定未完成同步：${error.message}`);
+    }finally{hiddenSyncBusy=false}
+  });
+}
+async function refreshSharedHiddenState(redraw=true){
+  if(hiddenSyncBusy)return;
+  hiddenSyncBusy=true;
+  try{
+    const remote=await readSharedHiddenState();
+    const changed=JSON.stringify(remote)!==JSON.stringify(hiddenState);
+    hiddenState=remote;
+    cacheHiddenState();
+    setHiddenSyncMessage("已同步");
+    if(changed&&redraw)renderItems();
+  }catch(error){setHiddenSyncMessage("同步失敗，顯示本機快取")}
+  finally{hiddenSyncBusy=false}
+}
+
+function updateHiddenToolbar(){
+  document.getElementById("hidden-toggle").textContent=showHiddenItems?"返回商品區":"隱藏區";
+  const cards=allItems.filter(isCardHidden).length;
+  const groups=allCategories.filter(isGroupHidden).length;
+  document.getElementById("hidden-count").textContent=`已隱藏 ${cards} 張卡片／${groups} 團`;
+  requestAnimationFrame(()=>{document.getElementById("card-container").style.paddingTop=(40+document.querySelector(".header-fixed").offsetHeight)+"px"});
+}
 
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
 function getV(r,i){if(i<0||!r.c||!r.c[i])return"";const c=r.c[i];return String(c.v??c.f??"").trim()}
@@ -671,6 +760,8 @@ if(!cars.length)target.innerHTML="<div style='font-size:11px;color:#999'>沒有�
 }
 
 function renderItems(){
+  ensureSyncIds();
+  updateHiddenToolbar();
   const box=document.getElementById("items-wrapper");
   box.innerHTML="";
 
@@ -696,7 +787,7 @@ function renderItems(){
     if(!a.length)return;
     const g=document.createElement("div");
     g.className="group-grid";
-    a.forEach(i=>g.appendChild(card(i)));
+    a.filter(i=>showHiddenItems?isItemHidden(i):!isItemHidden(i)).forEach(i=>g.appendChild(card(i)));
     box.appendChild(g);
   };
 
@@ -704,7 +795,9 @@ function renderItems(){
     const categories=selectedRole?[selectedRole]:allCategories;
 
     categories.forEach(c=>{
+      if(isGroupHidden(c)&&!showHiddenItems)return;
       const a=items.filter(i=>i.category===c);
+      if(showHiddenItems&&!a.some(isItemHidden))return;
       if(!a.length)return;
 
       const d=document.createElement("div");
@@ -713,6 +806,18 @@ function renderItems(){
       const title=document.createElement("span");
       title.textContent=c;
       d.appendChild(title);
+      d.classList.toggle("is-hidden",isGroupHidden(c));
+      const hideGroup=document.createElement("button");
+      hideGroup.className="group-hide-btn";
+      hideGroup.textContent=isGroupHidden(c)?"恢復整團":"隱藏整團";
+      hideGroup.onclick=e=>{e.stopPropagation();toggleHiddenEntry("groups",hiddenGroupKey(c))};
+      d.appendChild(hideGroup);
+      if(showHiddenItems){
+        if(!isGroupHidden(c))hideGroup.remove();
+        box.appendChild(d);
+        grid(a);
+        return;
+      }
 
       if(["pending","latest","reminder"].includes(currentTab)){
         const btn=document.createElement("button");
@@ -780,6 +885,7 @@ function renderItems(){
   }else{
     grid(items);
   }
+  if(!box.children.length)box.innerHTML="<div style='padding:40px;color:#999'>"+(showHiddenItems?"隱藏區目前沒有符合的項目":"目前項目都已隱藏，可到隱藏區恢復")+"</div>";
 }
 
 function createCard(item,status=""){
@@ -816,6 +922,14 @@ function createCard(item,status=""){
 
   const btn=c.querySelector(".add-btn-tag");
   if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
+  c.classList.toggle("is-hidden",isItemHidden(item));
+  c.style.display=(showHiddenItems?!isItemHidden(item):isItemHidden(item))?"none":"";
+  const hide=document.createElement("button");
+  hide.className="card-hide-btn";
+  hide.textContent=isCardHidden(item)?"恢復卡片":"隱藏卡片";
+  hide.onmousedown=hide.ontouchstart=e=>e.stopPropagation();
+  hide.onclick=e=>{e.stopPropagation();toggleHiddenEntry("cards",hiddenCardKey(item))};
+  c.appendChild(hide);
   c.onclick=()=>zoomCard(c);
   return c;
 }
@@ -839,7 +953,7 @@ setTimeout(()=>e.currentTarget.style.opacity=1,120);
 
 function addCategoryToCart(e,category){
 e.stopPropagation();
-let items=allItems.filter(i=>i.category===category&&!i._orderStatus);
+let items=allItems.filter(i=>i.category===category&&!i._orderStatus&&!isItemHidden(i));
 if(currentTab==="reminder")items=items.filter(i=>i.url).map(i=>({...i,urlOnly:true}));
 if(!items.length)return alert("這個分類沒有可加入的商品");
 cart.push(...items);saveCart();updateCartUI();
@@ -1193,6 +1307,7 @@ if("scrollRestoration" in history)history.scrollRestoration="manual";
 window.onload=async()=>{
   window.scrollTo(0,0);
   renderTabs();
+  await refreshSharedHiddenState(false);
   await loadShippingSettings();
   updateCartUI();
   await switchTab(currentTab);
@@ -3080,7 +3195,7 @@ async function(
 
         if(
           e.target.closest(
-            ".plan-copy-btn,.plan-remove-btn"
+            ".plan-copy-btn,.plan-remove-btn,.card-hide-btn"
           )
         ){
 
@@ -3716,7 +3831,7 @@ async function(
       .onclick=
         e=>
           addPlannedCart(
-            car.items,
+            car.items.filter(i=>!isItemHidden(i)),
             e.currentTarget
           );
 
@@ -3878,5 +3993,12 @@ async function(
 };
 
 </script>
+
+<script>
+// 開啟、返回頁面與每 30 秒取得其他瀏覽器的隱藏設定。
+setInterval(()=>{if(!document.hidden)refreshSharedHiddenState()},30000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshSharedHiddenState()});
+</script>
+
 </body>
 </html>

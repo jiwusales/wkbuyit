@@ -174,66 +174,104 @@ function isCardHidden(item){return !!hiddenState.cards[hiddenCardKey(item)]}
 function isGroupHidden(category){return !!hiddenState.groups[hiddenGroupKey(category)]}
 function isItemHidden(item){return isCardHidden(item)||isGroupHidden(item.category)}
 const HIDDEN_REMOTE_KEY="__jiwu_shared_visibility_v1__";
-let hiddenSyncBusy=false,hiddenSyncMessage="",hiddenSyncQueue=Promise.resolve();
+const HIDDEN_PENDING_KEY="jiwu_helper_hidden_pending_v1";
+const HIDDEN_CARD_MARK="__JIWU_HIDDEN_CARDS_V1__";
+const HIDDEN_GROUP_MARK="__JIWU_HIDDEN_GROUPS_V1__";
+let hiddenSyncBusy=false,hiddenSyncMessage="",hiddenSyncQueue=Promise.resolve(),hiddenPending={};
+try{hiddenPending=JSON.parse(localStorage.getItem(HIDDEN_PENDING_KEY)||"{}")}catch{}
+function applyHiddenPending(state){
+  Object.values(hiddenPending).forEach(change=>{
+    if(!["cards","groups"].includes(change.kind)||typeof change.key!=="string")return;
+    if(change.hidden)state[change.kind][change.key]=true;
+    else delete state[change.kind][change.key];
+  });
+  return state;
+}
+applyHiddenPending(hiddenState);
 function setHiddenSyncMessage(message){
   hiddenSyncMessage=message;
   document.getElementById("hidden-sync-status").textContent=message;
 }
 function cacheHiddenState(){
-  try{localStorage.setItem(HIDDEN_STORAGE_KEY,JSON.stringify(hiddenState))}catch{}
+  try{
+    localStorage.setItem(HIDDEN_STORAGE_KEY,JSON.stringify(hiddenState));
+    localStorage.setItem(HIDDEN_PENDING_KEY,JSON.stringify(hiddenPending));
+  }catch{}
 }
-async function readSharedHiddenState(){
-  const data=await Promise.race([
-    jsonp(`${PLAN_API}?action=loadPlan&key=${encodeURIComponent(HIDDEN_REMOTE_KEY)}&_=${Date.now()}`),
-    new Promise((_,reject)=>setTimeout(()=>reject(new Error("同步逾時")),12000))
-  ]);
+function decodeSharedHiddenState(data){
   if(!data?.ok)throw new Error(data?.error||"無法讀取隱藏設定");
   if(!data.found)return {cards:{},groups:{}};
-  if(!Array.isArray(data.cars)||data.cars.length!==2||!data.cars.every(row=>Array.isArray(row)&&row.every(key=>typeof key==="string")))throw new Error("雲端隱藏設定格式不符");
-  return {cards:Object.fromEntries(data.cars[0].map(key=>[key,true])),groups:Object.fromEntries(data.cars[1].map(key=>[key,true]))};
+  if(!Array.isArray(data.cars)||!data.cars.every(row=>Array.isArray(row)&&row.every(key=>typeof key==="string")))throw new Error("雲端隱藏設定格式不符");
+  const state={cards:{},groups:{}};
+  const tagged=data.cars.some(row=>[HIDDEN_CARD_MARK,HIDDEN_GROUP_MARK].includes(row[0]));
+  if(tagged){
+    data.cars.forEach(row=>{
+      const kind=row[0]===HIDDEN_CARD_MARK?"cards":row[0]===HIDDEN_GROUP_MARK?"groups":null;
+      if(kind)row.slice(1).forEach(key=>state[kind][key]=true);
+    });
+  }else if(data.cars.length===2){
+    data.cars[0].forEach(key=>state.cards[key]=true);
+    data.cars[1].forEach(key=>state.groups[key]=true);
+  }else{
+    // 相容舊資料：排單 API 可能移除空車，使只隱藏整團剩下一列。
+    data.cars.flat().forEach(key=>{
+      let parts;try{parts=JSON.parse(key)}catch{throw new Error("舊隱藏設定格式不符")}
+      if(!Array.isArray(parts)||parts.length!==2)throw new Error("舊隱藏設定格式不符");
+      const kind=/¦|#\d+|::EXTRA::/.test(String(parts[1]))?"cards":"groups";
+      state[kind][key]=true;
+    });
+  }
+  return state;
+}
+async function readSharedHiddenState(){
+  return decodeSharedHiddenState(await jsonp(`${PLAN_API}?action=loadPlan&key=${encodeURIComponent(HIDDEN_REMOTE_KEY)}&_=${Date.now()}`));
 }
 async function writeSharedHiddenState(state){
-  // 使用排單 API 的獨立紀錄，不改動各團排單。
-  await fetch(PLAN_API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"savePlan",key:HIDDEN_REMOTE_KEY,group:"隱藏區設定",limit:"1",cars:[Object.keys(state.cards),Object.keys(state.groups)]}),keepalive:true});
+  // 兩列均帶類型標記，避免 API 移除空車後分不出卡片和整團。
+  await fetch(PLAN_API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"savePlan",key:HIDDEN_REMOTE_KEY,group:"隱藏區設定",limit:"1",cars:[[HIDDEN_CARD_MARK,...Object.keys(state.cards)],[HIDDEN_GROUP_MARK,...Object.keys(state.groups)]]}),keepalive:true});
 }
 function toggleHiddenEntry(kind,key){
-  hiddenSyncQueue=hiddenSyncQueue.then(async()=>{
-    hiddenSyncBusy=true;
-    setHiddenSyncMessage("同步中…");
-    try{
-      const remote=await readSharedHiddenState();
-      const hiding=!remote[kind][key];
-      if(hiding)remote[kind][key]=true;else delete remote[kind][key];
-      await writeSharedHiddenState(remote);
-      let confirmed;
-      for(let attempt=0;attempt<4;attempt++){
-        confirmed=await readSharedHiddenState();
-        if(!!confirmed[kind][key]===hiding)break;
-        if(attempt===3)throw new Error("雲端尚未確認儲存，請稍後重試");
-        await new Promise(resolve=>setTimeout(resolve,1000));
-      }
-      hiddenState=confirmed;
-      cacheHiddenState();
-      setHiddenSyncMessage("已同步");
-      renderItems();
-    }catch(error){
-      setHiddenSyncMessage("同步失敗");
-      alert(`隱藏設定未完成同步：${error.message}`);
-    }finally{hiddenSyncBusy=false}
-  });
+  const hidden=!hiddenState[kind][key];
+  hiddenPending[JSON.stringify([kind,key])]={kind,key,hidden,version:Date.now()+Math.random()};
+  applyHiddenPending(hiddenState);
+  cacheHiddenState();
+  setHiddenSyncMessage("等待同步…");
+  renderItems();
+  hiddenSyncQueue=hiddenSyncQueue.then(()=>refreshSharedHiddenState());
 }
 async function refreshSharedHiddenState(redraw=true){
   if(hiddenSyncBusy)return;
   hiddenSyncBusy=true;
   try{
-    const remote=await readSharedHiddenState();
+    let remote=await readSharedHiddenState();
+    const batch=Object.entries(hiddenPending);
+    if(batch.length){
+      setHiddenSyncMessage("同步中…");
+      remote=applyHiddenPending(remote);
+      await writeSharedHiddenState(remote);
+      let verified=false;
+      for(let attempt=0;attempt<4;attempt++){
+        remote=await readSharedHiddenState();
+        verified=batch.every(([,change])=>!!remote[change.kind][change.key]===change.hidden);
+        if(verified)break;
+        if(attempt<3)await new Promise(resolve=>setTimeout(resolve,1000));
+      }
+      if(!verified)throw new Error("雲端尚未確認儲存");
+      batch.forEach(([id,change])=>{
+        if(hiddenPending[id]?.version===change.version)delete hiddenPending[id];
+      });
+    }
+    remote=applyHiddenPending(remote);
     const changed=JSON.stringify(remote)!==JSON.stringify(hiddenState);
     hiddenState=remote;
     cacheHiddenState();
-    setHiddenSyncMessage("已同步");
+    setHiddenSyncMessage(Object.keys(hiddenPending).length?"等待同步…":"已同步");
     if(changed&&redraw)renderItems();
-  }catch(error){setHiddenSyncMessage("同步失敗，顯示本機快取")}
-  finally{hiddenSyncBusy=false}
+  }catch(error){
+    // 保留本機操作，下一次刷新自動重試，舊雲端資料不覆蓋剛隱藏的團。
+    setHiddenSyncMessage(Object.keys(hiddenPending).length?"已在本機保留，雲端同步待重試":"同步失敗，顯示本機快取");
+    console.warn("隱藏設定同步失敗",error);
+  }finally{hiddenSyncBusy=false}
 }
 
 function updateHiddenToolbar(){
@@ -397,22 +435,51 @@ function productUrlKey(v){
   }catch{return norm(v)}
 }
 
-function findStock(item,stock){
-  const sn=String(item.sn??"").trim();
-
-  if(sn){
-    const s=stock.find(x=>String(x.sn??"").trim()===sn);
-    if(s)return s;
-  }
-
-  const url=productUrlKey(item.url);
-  if(url){
-    const s=stock.find(x=>productUrlKey(x.url)===url);
-    if(s)return s;
-  }
-
+function findStock(item,stock,strictGroup=false){
+  const group=norm(item.group),sn=norm(item.sn),url=productUrlKey(item.url);
   const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`);
-  return stock.find(x=>(norm(x.name)===name&&norm(x.role)===role)||norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full)||null;
+  // 不以名稱跨團補資料，避免同名新品取得另一團的貨號、網址或價格。
+  const sameGroup=stock.filter(x=>norm(x.group)===group);
+  const ungrouped=group?stock.filter(x=>!norm(x.group)):[];
+  function compatible(x){
+    if(sn&&norm(x.sn)&&norm(x.sn)!==sn)return false;
+    if(url&&productUrlKey(x.url)&&productUrlKey(x.url)!==url)return false;
+    return true;
+  }
+  function unique(matches){
+    if(!matches.length)return null;
+    // 重複庫存列可以合併使用；不同商品或不同價格則不猜測。
+    const keys=new Set(matches.map(x=>JSON.stringify([norm(x.sn),productUrlKey(x.url),norm(x.role),yen(x.originalPrice)])));
+    return keys.size===1?matches[0]:null;
+  }
+  function byIdentity(pool){
+    if(sn){
+      const candidates=pool.filter(x=>norm(x.sn)===sn&&compatible(x));
+      if(candidates.length)return {found:true,item:unique(candidates)};
+    }
+    if(url){
+      const candidates=pool.filter(x=>productUrlKey(x.url)===url&&compatible(x));
+      if(candidates.length)return {found:true,item:unique(candidates)};
+    }
+    return {found:false,item:null};
+  }
+  for(const pool of [sameGroup,ungrouped]){
+    const match=byIdentity(pool);
+    if(match.found)return match.item;
+  }
+  if(!strictGroup){
+    const match=byIdentity(stock);
+    if(match.found)return match.item;
+  }
+  if(!name)return null;
+  for(const pool of [sameGroup,ungrouped]){
+    const candidates=pool.filter(x=>compatible(x)&&(
+      (norm(x.name)===name&&norm(x.role)===role)||
+      norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full
+    ));
+    if(candidates.length)return unique(candidates);
+  }
+  return null;
 }
 
 function mergeStock(item,stock){
@@ -430,7 +497,7 @@ function mergeStock(item,stock){
 }
 
 function mergeLatestPrice(item,latest){
-  const s=findStock(item,latest);
+  const s=findStock(item,latest,true);
   return{
     ...item,
     img:s?.img||item.img||"",
@@ -1424,8 +1491,14 @@ function jsonp(url){
         );
 
 
+      const timeout=setTimeout(()=>{
+        done();
+        reject(new Error("同步讀取逾時"));
+      },12000);
+
       function done(){
 
+        clearTimeout(timeout);
         delete window[cb];
 
         s.remove();
@@ -2029,7 +2102,6 @@ function findSavedItem(
 
 
         if(
-          x.group&&
           norm(i.group)!==
             x.group
         ){

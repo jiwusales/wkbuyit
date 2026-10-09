@@ -1302,13 +1302,10 @@ const used=data.destinations.slice(1);
 used.forEach((d,i)=>{if(spare[i])spare[i].location.href=d.url});
 spare.slice(used.length).forEach(w=>{try{w.close()}catch{}});
 
-// 送出後清空購物車；分車排單由獨立儲存維持原樣。
 cart=[];
 saveCart();
 updateCartUI();
 closeModal();
-btn.disabled=false;
-btn.textContent="確認訂購";
 
 if(!data.destinations.length){
 renderItems();

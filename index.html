@@ -357,7 +357,7 @@ function isMoguItem(i){
   return originOf(i?.url)===SITES.mogu||/mogu|もぐもぐ/i.test(String(i?.group||""));
 }
 function itemReady(i){
-  return hasUrl(i)&&(isMoguItem(i)||hasSn(i));
+  return hasUrl(i);
 }
 
 async function getSheet(sheet,force=false){
@@ -596,10 +596,7 @@ async function switchTab(key){
         .map(i=>mergeStock(i,stock))
         .map(i=>mergeLatestPrice(i,latest));
 
-      /*
-        一般網站：貨號＋網址才算完整
-        もぐもぐ本舖：只要有商品網址就算完整，不需要貨號
-      */
+      // 所有網站統一以商品網址判斷是否可訂購，不要求貨號。
       const latestGroups=new Set(
         rows.filter(i=>norm(i.group)&&itemReady(i)).map(i=>norm(i.group))
       );
@@ -957,19 +954,11 @@ function renderItems(){
 
 function createCard(item,status=""){
   const c=document.createElement("div"),buyer=buyerText(item),rem=currentTab==="reminder";
-  const noSn=!hasSn(item),noUrl=!hasUrl(item),mogu=isMoguItem(item);
+  const noUrl=!hasUrl(item);
 
   let miss="";
-  if(rem){
-    let msg="";
-    if(mogu){
-      if(noUrl)msg="缺商品網址";
-    }else{
-      if(noSn&&noUrl)msg="缺貨號、商品網址";
-      else if(noSn)msg="缺貨號";
-      else if(noUrl)msg="缺商品網址";
-    }
-    if(msg)miss=`<div style="font-size:9px;color:#e66;margin-bottom:5px">${msg}</div>`;
+  if(rem&&noUrl){
+    miss='<div style="font-size:9px;color:#e66;margin-bottom:5px">缺商品網址</div>';
   }
 
   const warn=normalTab()&&item.colStock==="1";
@@ -1122,21 +1111,11 @@ async function tryShopify(item){
     if(!r.ok)return null;
 
     const p=await r.json(),vs=p.variants||[],vid=u.searchParams.get("variant");
-    let v;
-
-    // 網址本身有 variant 時優先使用
-    if(vid)v=vs.find(x=>String(x.id)===String(vid));
-
-    if(!v){
-      const isMogu=u.origin===SITES.mogu;
-
-      // もぐもぐ本舖：不驗證你輸入的貨號是不是官網 SKU
-      if(isMogu||item.urlOnly||item.useUrl||!hasSn(item)){
-        v=vs.find(x=>x.available!==false)||vs[0];
-      }else{
-        v=vs.find(x=>String(x.sku||"").trim()===String(item.sn||"").trim());
-      }
-    }
+    // 網址指定款式時只使用該款式；其他商品一律依網址取得可購買款式。
+    // 貨號僅供內部記錄，不用來比對官網 SKU。
+    const v=vid
+      ?vs.find(x=>String(x.id)===String(vid))
+      :vs.find(x=>x.available!==false)||vs[0];
 
     if(!v?.id)return null;
 

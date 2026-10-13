@@ -1097,6 +1097,17 @@ document.getElementById("modal-shipping").innerHTML=shippingHtml();
 }
 
 const CART_RULES={};
+function requirePocketAdapter(){
+ return new Promise((resolve,reject)=>{
+  const id=crypto.randomUUID();
+  const done=()=>{clearTimeout(timer);window.removeEventListener('message',receive)};
+  const receive=e=>{if(e.source===window&&e.data?.type==='jiwuPocketReady'&&e.data.id===id){done();resolve()}};
+  const timer=setTimeout(()=>{done();reject(Error('Pocket 需要敗家小幫手外掛 2.1.4：請到 chrome://extensions 重新載入更新後的外掛，再重新整理敗家小幫手。購物車內容已保留。'))},1000);
+  window.addEventListener('message',receive);
+  window.postMessage({type:'jiwuPocketPing',id},location.origin==='null'?'*':location.origin);
+ });
+}
+
 
 function cartHost(url){
 try{return new URL(url).hostname.replace(/^www\./,"")}catch{return""}
@@ -1177,6 +1188,12 @@ if(x)return x;
 }catch{}
 }
 
+// Pocket 自製官網由已安裝的敗家小幫手外掛接收商品網址。
+if(host==='chiikawa-pocket-goods-store.com'){
+ const u=new URL(item.url),match=u.pathname.match(/^\/products\/([^/]+)\/?$/);
+ if(match)return{kind:"pocket",handle:decodeURIComponent(match[1]),variant:u.searchParams.get("variant")||"",item};
+}
+
 const shopify=await tryShopify(item);
 if(shopify)return shopify;
 
@@ -1197,6 +1214,14 @@ result.filter(x=>x.kind==="shopify"&&x.available).forEach(x=>{
 const g=shopify[x.origin]??={qty:{}};
 g.qty[x.id]=(g.qty[x.id]||0)+1;
 });
+
+const pocketItems=result.filter(x=>x.kind==="pocket");
+if(pocketItems.length){
+ const quantities=new Map();
+ pocketItems.forEach(x=>{const key=JSON.stringify([x.handle,x.variant]);const row=quantities.get(key)||{handle:x.handle,variant:x.variant,quantity:0};row.quantity++;quantities.set(key,row)});
+ const payload={id:crypto.randomUUID(),items:[...quantities.values()]};
+ destinations.push({kind:"cart",url:`${SITES.pocket}/cart/#jiwu-pocket=${encodeURIComponent(JSON.stringify(payload))}`});
+}
 
 Object.entries(shopify).forEach(([o,g])=>destinations.push({
 kind:"cart",
@@ -1220,6 +1245,7 @@ destinations.push({kind:"cart",url:u.href});
 return{
 destinations,
 ordered:[
+...pocketItems.map(x=>x.item),
 ...result.filter(x=>x.kind==="shopify"&&x.available).map(x=>x.item),
 ...result.filter(x=>x.kind==="woocommerce").map(x=>x.item)
 ],
@@ -1267,6 +1293,7 @@ throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視
 spare.push(w);
 }
 
+if(cart.some(i=>cartHost(i.url)==='chiikawa-pocket-goods-store.com'))await requirePocketAdapter();
 const data=await makeCartData(cart);
 const manual=data.unresolved.map(i=>({...i,note:"🖥️"}));
 

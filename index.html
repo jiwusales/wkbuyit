@@ -431,7 +431,18 @@ async function loadOrderedCounts(){
 function productUrlKey(v){
   try{
     const u=new URL(String(v||"").trim());
-    return u.hostname.replace(/^www\./,"").toLowerCase()+u.pathname.replace(/\/+$/,"");
+    const host=u.hostname.replace(/^www\./,"").toLowerCase();
+    const path=u.pathname.replace(/\/+$/,"");
+    // 天貓／淘寶以查詢參數區分商品與款式；保留識別碼，忽略追蹤參數。
+    const identity=new URLSearchParams();
+    const keys=/(^|\.)((tmall|taobao)\.com)$/.test(host)
+      ?["id","skuId"]:["variant"];
+    for(const key of keys){
+      const value=u.searchParams.get(key);
+      if(value)identity.set(key,value);
+    }
+    const query=identity.toString();
+    return host+path+(query?`?${query}`:"");
   }catch{return norm(v)}
 }
 
@@ -449,7 +460,7 @@ function findStock(item,stock,strictGroup=false){
   function unique(matches){
     if(!matches.length)return null;
     // 重複庫存列可以合併使用；不同商品或不同價格則不猜測。
-    const keys=new Set(matches.map(x=>JSON.stringify([norm(x.sn),productUrlKey(x.url),norm(x.role),yen(x.originalPrice)])));
+    const keys=new Set(matches.map(x=>JSON.stringify([norm(x.sn),productUrlKey(x.url),norm(x.name),norm(x.role),yen(x.originalPrice),String(x.img||"").trim()])));
     return keys.size===1?matches[0]:null;
   }
   function byIdentity(pool){

@@ -119,6 +119,12 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 </style>
 </head>
 <body>
+<div id="helper-login" class="helper-login-overlay"><form class="helper-login-card" onsubmit="helperLogin(event)"><h2>吉物敗家小幫手</h2><p>請使用後台密碼登入</p><label>密碼<input name="password" type="password" autocomplete="current-password" required></label><label class="helper-trust"><input name="trusted" type="checkbox">記住這台裝置</label><p id="helper-login-error" role="alert"></p><button type="submit">登入</button></form></div>
+<style>
+.helper-login-overlay{position:fixed;inset:0;background:#f4f3f1;z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px}.helper-login-overlay[hidden]{display:none}.helper-login-card{width:320px;background:#fff;border-radius:14px;padding:24px;box-shadow:0 8px 30px #0001}.helper-login-card h2{margin:0 0 12px;font-size:20px}.helper-login-card p{font-size:14px;color:#777}.helper-login-card label{display:block;font-size:14px}.helper-login-card input[type=password]{display:block;box-sizing:border-box;width:100%;padding:12px;margin:8px 0 14px;border:1px solid #ddd;border-radius:8px;font-size:16px}.helper-login-card .helper-trust{display:flex;gap:8px;align-items:center;margin:12px 0}.helper-login-card button{width:100%;padding:12px;background:var(--theme);border:0;border-radius:8px;font-size:16px;color:white;font-weight:bold}.helper-login-card button:disabled{opacity:.6}#helper-login-error{color:#c34757}
+#helper-progress{position:fixed;left:8px;bottom:12px;z-index:15000;display:flex;flex-direction:column;gap:5px;max-height:50vh;overflow:auto;width:150px;pointer-events:none}#helper-progress[hidden]{display:none}.helper-progress-job{padding:6px;background:#fffffff2;border-radius:7px;box-shadow:0 1px 6px #0002;pointer-events:auto}.helper-progress-job button{display:block;border:0;background:none;color:#685d50;font-size:11px;text-align:left;padding:0;width:100%}.helper-progress-job button:disabled{opacity:1}.helper-progress-job small{display:block;color:#777;font-size:10px;margin-top:3px}.helper-progress-bar{height:3px;overflow:hidden;background:#eee;margin-top:5px}.helper-progress-bar i{display:block;height:100%;width:35%;background:var(--theme)}.helper-progress-job.active i{animation:helper-saving 1.4s linear infinite}.helper-progress-job.complete i{width:100%;background:#729a75}.helper-progress-job.failed i{width:100%;background:#dc7284}@keyframes helper-saving{from{transform:translateX(-100%)}to{transform:translateX(300%)}}@media(max-width:600px){#helper-progress{width:110px}}
+</style>
+
 
 <div class="top-bar">吉物敗家小幫手</div>
 
@@ -150,8 +156,96 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 </div></div>
 
 <script>
-const SHEET_ID="10Q4EOGZPMsu9WOyabxZjU8j6QNuGduM8L-h_mZ10ypQ",IMG="https://i.postimg.cc/bv5xRs04/image.png";
-const ORDER_API="https://script.google.com/macros/s/AKfycbz2MEC8O7cjxRLb3xQMGnOLlzfoPc8E_-PDnXjb8sCFph1oLvBAnY30y6OyzcA8iSVt/exec";
+// helper-db:start
+const HELPER_API='https://rilompdypgjzhynqjlwv.supabase.co/functions/v1/jiwu-admin-test';
+const HELPER_AUTH_KEY='jiwu_supabase_test_admin_auth_token',HELPER_TRUST_KEY='jiwu_supabase_test_admin_auth_token_trusted';
+const HELPER_PENDING_KEY='jiwu_helper_supabase_pending_v1',HELPER_CHECKOUT_KEY='jiwu_helper_supabase_checkout_v1';
+let helperAuthenticated=false,helperStarted=false,helperWriteRunning=false,helperProgressTimer=null,helperLoadTicket=0;
+const helperTableCache=new Map(),helperPlanSnapshots=new Map(),helperWriteJobs=[],helperProgressJobs=new Map();
+try{for(const job of JSON.parse(localStorage.getItem(HELPER_PENDING_KEY)||'[]'))if(['helperSavePlan','helperDeletePlan'].includes(job.action)&&job.params?.requestId)helperWriteJobs.push({...job,waiters:[]});}catch{}
+function helperToken(){try{return localStorage.getItem(HELPER_TRUST_KEY)||sessionStorage.getItem(HELPER_AUTH_KEY)||'';}catch{return '';}}
+function helperPersistWrites(){try{localStorage.setItem(HELPER_PENDING_KEY,JSON.stringify(helperWriteJobs.filter(job=>job.action!=='helperRecordOrder').map(({action,params,createdAt})=>({action,params,createdAt}))));}catch(error){console.warn('待儲存資料保留於目前頁面',error);}}
+function helperShowLogin(message=''){
+ helperAuthenticated=false;helperStarted=false;helperLoadTicket++;const overlay=document.getElementById('helper-login');if(overlay)overlay.hidden=false;
+ const error=document.getElementById('helper-login-error');if(error)error.textContent=message;
+}
+async function helperRequest(action,params={}){
+ const token=helperToken();if(!['authLogin','authWarmup','authCheck'].includes(action)&&!token){helperShowLogin();throw Error('請先登入後台');}
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
+ try{
+  const response=await fetch(HELPER_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...params,action,...(token?{token}:{}),requestId:params.requestId||crypto.randomUUID()}),signal:controller.signal});
+  const data=await response.json();if(!response.ok||data.ok===false){
+   if(data.error==='登入已失效，請重新登入'&&token===helperToken()){sessionStorage.removeItem(HELPER_AUTH_KEY);localStorage.removeItem(HELPER_TRUST_KEY);helperShowLogin(data.error);}
+   throw Error(data.error||'資料儲存失敗');
+  }
+  return data;
+ }catch(error){if(error.name==='AbortError')throw Error('連線逾時，尚未確認的資料已保留，請重試');throw error;}finally{clearTimeout(timer);}
+}
+function helperProgress(job,state,error=''){
+ const progress={...(helperProgressJobs.get(job.params.requestId)||{id:job.params.requestId,createdAt:job.createdAt||Date.now()})};helperProgressJobs.set(progress.id,progress);
+ progress.step=job.action==='helperRecordOrder'?'登記訂購':job.action==='helperDeletePlan'?'刪除排單':job.params.key==='__jiwu_shared_visibility_v1__'?'儲存隱藏':'儲存排單';progress.state=state;progress.error=error;
+ progress.endedAt=['完成','失敗'].includes(state)?Date.now():0;helperPaintProgress();
+ if(state==='完成')setTimeout(()=>{if(helperProgressJobs.get(progress.id)===progress&&progress.state==='完成'){helperProgressJobs.delete(progress.id);helperPaintProgress();}},2000);
+}
+function helperPaintProgress(){
+ let host=document.getElementById('helper-progress');if(!host){host=document.createElement('div');host.id='helper-progress';host.setAttribute('aria-live','polite');document.body.appendChild(host);}
+ host.replaceChildren();for(const progress of helperProgressJobs.values()){
+  const card=document.createElement('div');card.className='helper-progress-job '+(progress.state==='失敗'?'failed':progress.state==='完成'?'complete':'active');
+  const step=document.createElement('button');step.type='button';step.textContent=progress.state+'：'+progress.step;step.title=progress.error;step.disabled=progress.state!=='失敗';step.onclick=()=>helperDrainWrites();
+  const bar=document.createElement('div');bar.className='helper-progress-bar';const fill=document.createElement('i');bar.appendChild(fill);
+  const time=document.createElement('small');time.textContent=Math.max(0,Math.floor(((progress.endedAt||Date.now())-progress.createdAt)/1000))+' 秒';card.append(step,bar,time);host.appendChild(card);
+ }
+ const active=[...helperProgressJobs.values()].some(job=>!job.endedAt);if(active&&!helperProgressTimer)helperProgressTimer=setInterval(helperPaintProgress,1000);else if(!active&&helperProgressTimer){clearInterval(helperProgressTimer);helperProgressTimer=null;}
+ host.hidden=!helperProgressJobs.size;
+}
+function helperWrite(action,params={}){
+ const snapshot=JSON.parse(JSON.stringify(params));snapshot.requestId||=crypto.randomUUID();let job=helperWriteJobs.find(job=>job.params.requestId===snapshot.requestId);
+ if(!job){job={action,params:snapshot,createdAt:Date.now(),waiters:[]};helperWriteJobs.push(job);helperPersistWrites();helperProgress(job,'排隊中');}
+ const pending=new Promise((resolve,reject)=>job.waiters.push({resolve,reject}));void helperDrainWrites();return pending;
+}
+async function helperDrainWrites(){
+ if(helperWriteRunning||!helperAuthenticated)return;helperWriteRunning=true;
+ try{while(helperWriteJobs.length&&helperAuthenticated){const job=helperWriteJobs[0];helperProgress(job,'傳送中');
+  try{const result=await helperRequest(job.action,job.params);helperWriteJobs.shift();helperPersistWrites();helperProgress(job,'完成');job.waiters.splice(0).forEach(waiter=>waiter.resolve(result));}
+  catch(error){helperProgress(job,'失敗',error.message);job.waiters.splice(0).forEach(waiter=>waiter.reject(error));if(job.action==='helperRecordOrder'){helperWriteJobs.shift();helperPersistWrites();continue;}break;}
+ }}finally{helperWriteRunning=false;}
+}
+async function helperReadTable(name){
+ if(helperTableCache.has(name))return helperTableCache.get(name);
+ const data=await helperRequest('helperSnapshot',{sheets:[name]});helperTableCache.set(name,data.tables[name]);return data.tables[name];
+}
+async function helperLoadTables(names,ticket){
+ const data=await helperRequest('helperSnapshot',{sheets:[...new Set(names)]});if(ticket!==helperLoadTicket)return false;
+ helperTableCache.clear();for(const [name,table] of Object.entries(data.tables))helperTableCache.set(name,table);return true;
+}
+function helperCheckoutRead(){try{const value=JSON.parse(localStorage.getItem(HELPER_CHECKOUT_KEY)||'null');return value&&typeof value.requestId==='string'&&Array.isArray(value.cart)&&['ordered','soldOut','unresolved','destinations'].every(key=>Array.isArray(value.data?.[key]))?value:null;}catch{return null;}}
+function helperCheckoutStore(value){if(value)localStorage.setItem(HELPER_CHECKOUT_KEY,JSON.stringify(value));else localStorage.removeItem(HELPER_CHECKOUT_KEY);}
+function helperCartIdentity(item){return JSON.stringify([item.group||'',String(item.sn||''),item.name||'',item.role||'',item.url||'',item.__extra===true,item.__planId||'']);}
+function helperRemoveSubmittedCart(submitted){
+ const counts=new Map();for(const item of submitted){const key=helperCartIdentity(item);counts.set(key,(counts.get(key)||0)+1);}
+ cart=cart.filter(item=>{const key=helperCartIdentity(item),remaining=counts.get(key)||0;if(!remaining)return true;counts.set(key,remaining-1);return false;});
+}
+async function helperLogin(event){
+ event.preventDefault();const form=event.currentTarget,input=form.elements.password,button=form.querySelector('button'),error=document.getElementById('helper-login-error');button.disabled=true;error.textContent='驗證中…';
+ try{const trusted=form.elements.trusted.checked,result=await helperRequest('authLogin',{password:input.value,trusted});
+  if(trusted){localStorage.setItem(HELPER_TRUST_KEY,result.token);sessionStorage.removeItem(HELPER_AUTH_KEY);}else{sessionStorage.setItem(HELPER_AUTH_KEY,result.token);localStorage.removeItem(HELPER_TRUST_KEY);}
+  input.value='';helperAuthenticated=true;document.getElementById('helper-login').hidden=true;await helperStart();
+ }catch(failure){error.textContent=failure.message;}finally{button.disabled=false;}
+}
+async function helperStart(){
+ void helperDrainWrites();if(helperStarted)return;helperStarted=true;
+ try{window.scrollTo(0,0);renderTabs();await Promise.all([refreshSharedHiddenState(false),loadShippingSettings()]);if(!helperAuthenticated)return;updateCartUI();await switchTab(currentTab);window.scrollTo(0,0);}catch(error){helperStarted=false;throw error;}
+}
+async function helperInit(){
+ renderTabs();if(!helperToken()){helperShowLogin();return;}
+ try{await helperRequest('authCheck');helperAuthenticated=true;document.getElementById('helper-login').hidden=true;await helperStart();}catch(error){helperShowLogin(error.message);}
+}
+window.addEventListener('online',()=>{if(helperAuthenticated)void helperDrainWrites();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(helperAuthenticated)void helperDrainWrites();else if(helperToken())void helperInit();}});
+window.addEventListener('storage',event=>{if([HELPER_AUTH_KEY,HELPER_TRUST_KEY].includes(event.key)&&!helperAuthenticated&&helperToken())void helperInit();});
+setInterval(()=>{if(helperAuthenticated&&navigator.onLine&&helperWriteJobs.length)void helperDrainWrites();},30000);
+// helper-db:end
+const IMG="https://i.postimg.cc/bv5xRs04/image.png";
 const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop",pocket:"https://chiikawa-pocket-goods-store.com"},ALLOWED=Object.values(SITES);
 const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
 const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
@@ -224,11 +318,11 @@ function decodeSharedHiddenState(data){
   return state;
 }
 async function readSharedHiddenState(){
-  return decodeSharedHiddenState(await jsonp(`${PLAN_API}?action=loadPlan&key=${encodeURIComponent(HIDDEN_REMOTE_KEY)}&_=${Date.now()}`));
+  return decodeSharedHiddenState(await helperRequest('helperLoadPlan',{key:HIDDEN_REMOTE_KEY}));
 }
 async function writeSharedHiddenState(state){
   // 兩列均帶類型標記，避免 API 移除空車後分不出卡片和整團。
-  await fetch(PLAN_API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"savePlan",key:HIDDEN_REMOTE_KEY,group:"隱藏區設定",limit:"1",cars:[[HIDDEN_CARD_MARK,...Object.keys(state.cards)],[HIDDEN_GROUP_MARK,...Object.keys(state.groups)]]}),keepalive:true});
+  await helperWrite('helperSavePlan',{key:HIDDEN_REMOTE_KEY,group:'隱藏區設定',limit:'1',cars:[[HIDDEN_CARD_MARK,...Object.keys(state.cards)],[HIDDEN_GROUP_MARK,...Object.keys(state.groups)]]});
 }
 function toggleHiddenEntry(kind,key){
   const hidden=!hiddenState[kind][key];
@@ -240,7 +334,7 @@ function toggleHiddenEntry(kind,key){
   hiddenSyncQueue=hiddenSyncQueue.then(()=>refreshSharedHiddenState());
 }
 async function refreshSharedHiddenState(redraw=true){
-  if(hiddenSyncBusy)return;
+  if(hiddenSyncBusy||!helperAuthenticated)return;
   hiddenSyncBusy=true;
   try{
     let remote=await readSharedHiddenState();
@@ -303,8 +397,7 @@ return new URL(s).hostname.replace(/^www\./,"").toLowerCase();
 
 async function loadShippingSettings(){
 try{
-const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("網站運費")}&headers=1`;
-const t=await fetch(url).then(r=>r.text()),d=JSON.parse(t.substr(47).slice(0,-2)),L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
+const d=await helperReadTable('網站運費'),L=(d.table.cols||[]).map(c=>String(c.label||'').trim());
 const U=col(L,"網址"),F=col(L,"免運金額"),S=col(L,"運費"),N=col(L,"備註");
 if(U<0||F<0||S<0||N<0)throw new Error("網站運費分頁缺少「網址、免運金額、運費、備註」欄位");
 const map={};
@@ -363,9 +456,7 @@ function itemReady(i){
 async function getSheet(sheet,force=false){
   if(!force&&sheetCache[sheet])return sheetCache[sheet];
 
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}&headers=1&_=${Date.now()}`;
-  const t=await fetch(url,{cache:"no-store"}).then(r=>r.text());
-  const data=JSON.parse(t.substr(47).slice(0,-2));
+  const data=await helperReadTable(sheet);
   const L=(data.table.cols||[]).map(c=>String(c.label||"").trim());
 
   const C={
@@ -374,6 +465,7 @@ async function getSheet(sheet,force=false){
     type:findCol(L,["種類","類型"]),
     name:findCol(L,["名稱","商品名稱","品名"]),
     originalPrice:findCol(L,["原價","商品原價","日幣原價"]),
+    salePrice:findCol(L,["售價"]),
     stock:findCol(L,["庫存"]),
     sn:findCols(L,["貨號","商品貨號","商品編號","品番","SKU","sku"],["貨號","SKU","品番"]),
     img:findCol(L,["圖片","首圖","圖片網址"]),
@@ -390,6 +482,7 @@ async function getSheet(sheet,force=false){
     type:getV(r,C.type),
     name:getV(r,C.name),
     originalPrice:getV(r,C.originalPrice),
+    salePrice:getV(r,C.salePrice),
     colStock:getV(r,C.stock),
     sn:getAnyV(r,C.sn),
     img:getV(r,C.img),
@@ -405,9 +498,7 @@ async function getSheet(sheet,force=false){
 }
 
 async function loadOrderedCounts(){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent("已訂購清單")}&headers=1&_=${Date.now()}`;
-  const t=await fetch(url,{cache:"no-store"}).then(r=>r.text());
-  const d=JSON.parse(t.substr(47).slice(0,-2));
+  const d=await helperReadTable('已訂購清單');
   const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
 
   const S=findCols(L,["貨號","商品貨號","SKU"],["貨號","SKU"]);
@@ -564,6 +655,7 @@ function filterNormal(rows,key){
 }
 
 async function switchTab(key){
+  if(!helperAuthenticated)return;const ticket=++helperLoadTicket;
   currentTab=key;
   selectedTypes=[];
   selectedRole=null;
@@ -578,6 +670,8 @@ async function switchTab(key){
   document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
   try{
+    const names=[TABS[key].sheet,"已訂購清單",...(["pending","latest","reminder"].includes(key)?["商品庫存"]:[]),...(["latest","reminder"].includes(key)?["最新開團"]:[])];
+    if(!await helperLoadTables(names,ticket))return;
     let rows=await getSheet(TABS[key].sheet,true),stock;
     await loadOrderedCounts();
 
@@ -623,6 +717,7 @@ async function switchTab(key){
     }
 
     rows=await fillMissingImages(rows);
+    if(ticket!==helperLoadTicket||!helperAuthenticated)return;
 
     allItems=rows.map(i=>({
       ...i,
@@ -648,8 +743,9 @@ async function switchTab(key){
     });
 
   }catch(e){
+    if(ticket!==helperLoadTicket)return;
     console.error(e);
-    document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入失敗</div>";
+    document.getElementById("items-wrapper").textContent="載入失敗："+e.message;
   }
 }
 
@@ -1265,24 +1361,12 @@ unresolved:[...result.filter(x=>x.kind==="page").map(x=>x.item),...result.filter
 };
 }
 
-function recordOrderedList(ordered,soldOut){
-const pack=a=>a.map(i=>({
-group:i.group||"",
-sn:String(i.sn||"").trim(),
-name:String(i.name||"").trim(),
-note:i.note||"",
-extra:i.__extra===true
-}));
-
-const body=JSON.stringify({
-action:"recordOrder",
-ordered:pack(ordered),
-soldOut:pack(soldOut)
-});
-
-const blob=new Blob([body],{type:"text/plain;charset=utf-8"});
-if(!navigator.sendBeacon||!navigator.sendBeacon(ORDER_API,blob))
-fetch(ORDER_API,{method:"POST",body,keepalive:true,mode:"no-cors"}).catch(()=>{});
+function helperPackRecord(ordered,soldOut){
+ const pack=items=>items.map(item=>({group:item.group||'',sn:String(item.sn||'').trim(),name:String(item.name||'').trim(),note:item.note||'',extra:item.__extra===true,source:item.source||'',salePrice:item.salePrice??''}));
+ return {ordered:pack(ordered),soldOut:pack(soldOut)};
+}
+async function recordOrderedList(ordered,soldOut,requestId){
+ return helperWrite('helperRecordOrder',{...helperPackRecord(ordered,soldOut),requestId:requestId||crypto.randomUUID()});
 }
 
 async function handleFinalCheckout(){
@@ -1293,7 +1377,8 @@ btn.textContent="正在辨識購物車...";
 const spare=[];
 
 try{
-const uniqueUrls=[...new Set(cart.map(i=>i.url).filter(Boolean))];
+let pending=helperCheckoutRead();const submitted=pending?.cart||JSON.parse(JSON.stringify(cart));
+const uniqueUrls=[...new Set(submitted.map(i=>i.url).filter(Boolean))];
 
 for(let i=1;i<uniqueUrls.length;i++){
 const w=window.open("about:blank","_blank");
@@ -1304,11 +1389,12 @@ throw new Error("瀏覽器阻擋新分頁，請允許此網站開啟彈出式視
 spare.push(w);
 }
 
-if(cart.some(i=>cartHost(i.url)==='chiikawa-pocket-goods-store.com'))await requirePocketAdapter();
-const data=await makeCartData(cart);
-const manual=data.unresolved.map(i=>({...i,note:"🖥️"}));
-
-recordOrderedList([...data.ordered,...manual],data.soldOut);
+if(submitted.some(i=>cartHost(i.url)==='chiikawa-pocket-goods-store.com'))await requirePocketAdapter();
+const data=pending?.data||await makeCartData(submitted);
+const manual=data.unresolved.map(i=>({...i,note:'🖥️'}));
+if(!pending){pending={cart:submitted,data,requestId:crypto.randomUUID()};helperCheckoutStore(pending);}
+btn.textContent='正在登記訂購…';
+await recordOrderedList([...data.ordered,...manual],data.soldOut,pending.requestId);
 
 data.soldOut.forEach(i=>{
 const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
@@ -1319,8 +1405,9 @@ const used=data.destinations.slice(1);
 used.forEach((d,i)=>{if(spare[i])spare[i].location.href=d.url});
 spare.slice(used.length).forEach(w=>{try{w.close()}catch{}});
 
-cart=[];
+helperRemoveSubmittedCart(submitted);
 saveCart();
+helperCheckoutStore(null);
 updateCartUI();
 closeModal();
 
@@ -1388,19 +1475,10 @@ el.addEventListener("touchstart",start,{passive:false});
 
 if("scrollRestoration" in history)history.scrollRestoration="manual";
 
-window.onload=async()=>{
-  window.scrollTo(0,0);
-  renderTabs();
-  await refreshSharedHiddenState(false);
-  await loadShippingSettings();
-  updateCartUI();
-  await switchTab(currentTab);
-  window.scrollTo(0,0);
-};
+window.onload=helperInit;
 </script>
 
 <script>
-const PLAN_API="https://script.google.com/macros/s/AKfycbwCmtwlK88B8yK2imEUWub_ERY6FLMO0KbYFhfFW64ai5g4NLhizcKQRkUwjWYjvtZQlA/exec";
 
 let remotePlanCache={};
 
@@ -1409,9 +1487,7 @@ let remotePlanCache={};
    基本
 ========================= */
 
-function planApiReady(){
-  return /^https:\/\/script\.google\.com\/macros\/s\//.test(PLAN_API);
-}
+function planApiReady(){return helperAuthenticated;}
 
 function planKey(c){
   return `${currentTab}|${c}`;
@@ -1491,75 +1567,7 @@ function baseSyncId(id){
 
 
 /* =========================
-   JSONP 讀取 GAS
-========================= */
-
-function jsonp(url){
-
-  return new Promise(
-    (resolve,reject)=>{
-
-      const cb=
-        `__plan_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-      const s=
-        document.createElement(
-          "script"
-        );
-
-
-      const timeout=setTimeout(()=>{
-        done();
-        reject(new Error("同步讀取逾時"));
-      },12000);
-
-      function done(){
-
-        clearTimeout(timeout);
-        delete window[cb];
-
-        s.remove();
-
-      }
-
-
-      window[cb]=data=>{
-
-        done();
-
-        resolve(data);
-
-      };
-
-
-      s.onerror=()=>{
-
-        done();
-
-        reject(
-          new Error(
-            "同步讀取失敗"
-          )
-        );
-
-      };
-
-
-      s.src=
-        `${url}${url.includes("?")?"&":"?"}callback=${cb}`;
-
-
-      document.head
-        .appendChild(s);
-
-    }
-  );
-
-}
-
-
-/* =========================
-   讀取排單
+   從新資料庫讀取排單
 ========================= */
 
 async function loadPlanRemote(
@@ -1606,7 +1614,7 @@ async function loadPlanRemote(
 
 
   /*
-    再讀試算表
+    再讀新資料庫
   */
 
   let remote=null;
@@ -1614,9 +1622,7 @@ async function loadPlanRemote(
   try{
 
     const data=
-      await jsonp(
-        `${PLAN_API}?action=loadPlan&key=${encodeURIComponent(key)}&_=${Date.now()}`
-      );
+      (!force&&helperPlanSnapshots.has(key)?helperPlanSnapshots.get(key):await helperRequest('helperLoadPlan',{key}));
 
 
     if(
@@ -1689,8 +1695,8 @@ async function loadPlanRemote(
 
 
   /*
-    試算表比較新
-    → 使用試算表
+    新資料庫比較新
+    → 使用新資料庫
   */
 
   if(remote){
@@ -1764,8 +1770,6 @@ function savePlanRemote(
 
   const body={
 
-    action:"savePlan",
-
     key,
 
     group:
@@ -1833,83 +1837,8 @@ function savePlanRemote(
   }catch{}
 
 
-  /*
-    再同步 GAS
-  */
-
-  const raw=
-    JSON.stringify(
-      body
-    );
-
-
-  const blob=
-    new Blob(
-      [raw],
-      {
-        type:
-          "text/plain;charset=utf-8"
-      }
-    );
-
-
-  /*
-    優先用 sendBeacon
-    刷新頁面時也比較不容易中斷
-  */
-
-  if(
-    navigator.sendBeacon
-  ){
-
-    try{
-
-      if(
-        navigator.sendBeacon(
-          PLAN_API,
-          blob
-        )
-      ){
-
-        return;
-
-      }
-
-    }catch{}
-
-  }
-
-
-  fetch(
-    PLAN_API,
-    {
-
-      method:"POST",
-
-      headers:{
-        "Content-Type":
-          "text/plain;charset=utf-8"
-      },
-
-      body:
-        raw,
-
-      mode:
-        "no-cors",
-
-      keepalive:
-        true
-
-    }
-  )
-  .catch(
-    e=>
-      console.warn(
-        "排單同步儲存失敗",
-        e
-      )
-  );
-
+  helperPlanSnapshots.set(key,{...cache,updatedAt:new Date(cache.savedAt).toISOString()});
+  void helperWrite('helperSavePlan',body).catch(error=>console.warn('排單保留於本機，等待重試',error));
 }
 
 
@@ -1942,73 +1871,8 @@ function deletePlanRemote(
   }catch{}
 
 
-  const raw=
-    JSON.stringify({
-
-      action:
-        "deletePlan",
-
-      key
-
-    });
-
-
-  const blob=
-    new Blob(
-      [raw],
-      {
-        type:
-          "text/plain;charset=utf-8"
-      }
-    );
-
-
-  if(
-    navigator.sendBeacon
-  ){
-
-    try{
-
-      if(
-        navigator.sendBeacon(
-          PLAN_API,
-          blob
-        )
-      ){
-
-        return;
-
-      }
-
-    }catch{}
-
-  }
-
-
-  fetch(
-    PLAN_API,
-    {
-
-      method:"POST",
-
-      headers:{
-        "Content-Type":
-          "text/plain;charset=utf-8"
-      },
-
-      body:
-        raw,
-
-      mode:
-        "no-cors",
-
-      keepalive:
-        true
-
-    }
-  )
-  .catch(()=>{});
-
+  helperPlanSnapshots.delete(key);
+  void helperWrite('helperDeletePlan',{key}).catch(error=>console.warn('排單刪除尚未確認，等待重試',error));
 }
 
 
@@ -2570,7 +2434,7 @@ async function loadSyncedOrderLimits(){
 
 
   ensureSyncIds();
-
+  try{const batch=await helperRequest('helperLoadPlan',{keys:allCategories.map(planKey)});for(const [key,plan] of Object.entries(batch.plans))helperPlanSnapshots.set(key,plan);}catch(error){console.warn('排單讀取失敗，保留本機排單',error);}
 
   await Promise.all(
 
@@ -2640,6 +2504,7 @@ async function(key){
   await __originalSwitchTab(
     key
   );
+  if(currentTab!==key||!helperAuthenticated)return;
 
 
   if(
@@ -2892,7 +2757,7 @@ async function(
   /*
     還原完立即存一次
     新商品補進去後
-    試算表也同步更新
+    新資料庫也同步更新
   */
 
   savePlanRemote(

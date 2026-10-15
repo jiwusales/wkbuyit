@@ -159,12 +159,12 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 // helper-db:start
 const HELPER_API='https://rilompdypgjzhynqjlwv.supabase.co/functions/v1/jiwu-admin-test';
 const HELPER_AUTH_KEY='jiwu_supabase_test_admin_auth_token',HELPER_TRUST_KEY='jiwu_supabase_test_admin_auth_token_trusted';
-const HELPER_PENDING_KEY='jiwu_helper_supabase_pending_v1',HELPER_CHECKOUT_KEY='jiwu_helper_supabase_checkout_v1';
+const HELPER_PENDING_KEY='jiwu_helper_supabase_pending_v1';
 let helperAuthenticated=false,helperStarted=false,helperWriteRunning=false,helperProgressTimer=null,helperLoadTicket=0;
 const helperTableCache=new Map(),helperPlanSnapshots=new Map(),helperWriteJobs=[],helperProgressJobs=new Map();
 try{for(const job of JSON.parse(localStorage.getItem(HELPER_PENDING_KEY)||'[]'))if(['helperSavePlan','helperDeletePlan'].includes(job.action)&&job.params?.requestId)helperWriteJobs.push({...job,waiters:[]});}catch{}
 function helperToken(){try{return localStorage.getItem(HELPER_TRUST_KEY)||sessionStorage.getItem(HELPER_AUTH_KEY)||'';}catch{return '';}}
-function helperPersistWrites(){try{localStorage.setItem(HELPER_PENDING_KEY,JSON.stringify(helperWriteJobs.filter(job=>job.action!=='helperRecordOrder').map(({action,params,createdAt})=>({action,params,createdAt}))));}catch(error){console.warn('待儲存資料保留於目前頁面',error);}}
+function helperPersistWrites(){try{localStorage.setItem(HELPER_PENDING_KEY,JSON.stringify(helperWriteJobs.map(({action,params,createdAt})=>({action,params,createdAt}))));}catch(error){console.warn('待儲存資料保留於目前頁面',error);}}
 function helperShowLogin(message=''){
  helperAuthenticated=false;helperStarted=false;helperLoadTicket++;const overlay=document.getElementById('helper-login');if(overlay)overlay.hidden=false;
  const error=document.getElementById('helper-login-error');if(error)error.textContent=message;
@@ -183,7 +183,7 @@ async function helperRequest(action,params={}){
 }
 function helperProgress(job,state,error=''){
  const progress={...(helperProgressJobs.get(job.params.requestId)||{id:job.params.requestId,createdAt:job.createdAt||Date.now()})};helperProgressJobs.set(progress.id,progress);
- progress.step=job.action==='helperRecordOrder'?'登記訂購':job.action==='helperDeletePlan'?'刪除排單':job.params.key==='__jiwu_shared_visibility_v1__'?'儲存隱藏':'儲存排單';progress.state=state;progress.error=error;
+ progress.step=job.action==='helperDeletePlan'?'刪除排單':job.params.key==='__jiwu_shared_visibility_v1__'?'儲存隱藏':'儲存排單';progress.state=state;progress.error=error;
  progress.endedAt=['完成','失敗'].includes(state)?Date.now():0;helperPaintProgress();
  if(state==='完成')setTimeout(()=>{if(helperProgressJobs.get(progress.id)===progress&&progress.state==='完成'){helperProgressJobs.delete(progress.id);helperPaintProgress();}},2000);
 }
@@ -207,7 +207,7 @@ async function helperDrainWrites(){
  if(helperWriteRunning||!helperAuthenticated)return;helperWriteRunning=true;
  try{while(helperWriteJobs.length&&helperAuthenticated){const job=helperWriteJobs[0];helperProgress(job,'傳送中');
   try{const result=await helperRequest(job.action,job.params);helperWriteJobs.shift();helperPersistWrites();helperProgress(job,'完成');job.waiters.splice(0).forEach(waiter=>waiter.resolve(result));}
-  catch(error){helperProgress(job,'失敗',error.message);job.waiters.splice(0).forEach(waiter=>waiter.reject(error));if(job.action==='helperRecordOrder'){helperWriteJobs.shift();helperPersistWrites();continue;}break;}
+  catch(error){helperProgress(job,'失敗',error.message);job.waiters.splice(0).forEach(waiter=>waiter.reject(error));break;}
  }}finally{helperWriteRunning=false;}
 }
 async function helperReadTable(name){
@@ -218,8 +218,6 @@ async function helperLoadTables(names,ticket){
  const data=await helperRequest('helperSnapshot',{sheets:[...new Set(names)]});if(ticket!==helperLoadTicket)return false;
  helperTableCache.clear();for(const [name,table] of Object.entries(data.tables))helperTableCache.set(name,table);return true;
 }
-function helperCheckoutRead(){try{const value=JSON.parse(localStorage.getItem(HELPER_CHECKOUT_KEY)||'null');return value&&typeof value.requestId==='string'&&Array.isArray(value.cart)&&['ordered','soldOut','unresolved','destinations'].every(key=>Array.isArray(value.data?.[key]))?value:null;}catch{return null;}}
-function helperCheckoutStore(value){if(value)localStorage.setItem(HELPER_CHECKOUT_KEY,JSON.stringify(value));else localStorage.removeItem(HELPER_CHECKOUT_KEY);}
 function helperCartIdentity(item){return JSON.stringify([item.group||'',String(item.sn||''),item.name||'',item.role||'',item.url||'',item.__extra===true,item.__planId||'']);}
 function helperRemoveSubmittedCart(submitted){
  const counts=new Map();for(const item of submitted){const key=helperCartIdentity(item);counts.set(key,(counts.get(key)||0)+1);}
@@ -497,26 +495,27 @@ async function getSheet(sheet,force=false){
   return rows;
 }
 
+function purchaseProductIdentity(item){
+  if(item.url&&originOf(item.url)==='https://chiikawa-pocket-goods-store.com')return `U:${productUrlKey(item.url)}`;
+  return item.sn?`S:${norm(item.sn)}`:item.url?`U:${productUrlKey(item.url)}`:`N:${norm(productText(item))}`;
+}
+function purchaseQuantityKey(item){return JSON.stringify([norm(item.group),purchaseProductIdentity(item)]);}
 async function loadOrderedCounts(){
-  const d=await helperReadTable('已訂購清單');
+  const d=await helperReadTable('訂購記錄');
   const L=(d.table.cols||[]).map(c=>String(c.label||"").trim());
-
-  const S=findCols(L,["貨號","商品貨號","SKU"],["貨號","SKU"]);
-  const N=findCol(L,["名稱","商品名稱","品名"]);
-  const Q=findCol(L,["數量"]);
-  const O=findCol(L,["缺貨"]);
-  const ok={},bad={};
-
-  (d.table.rows||[]).forEach(r=>{
-    const sn=getAnyV(r,S),name=getV(r,N);
-    if(!sn&&!name)return;
-    const key=sn?`S:${norm(sn)}`:`N:${norm(name)}`;
-    ok[key]=(ok[key]||0)+(Number(getV(r,Q))||0);
-    bad[key]=(bad[key]||0)+(Number(getV(r,O))||0);
+  const S=findCols(L,["貨號","商品貨號","SKU"],["貨號","SKU"]),N=findCol(L,["名稱","商品名稱","品名"]),Q=findCol(L,["數量"]),G=findCol(L,["團名"]),R=findCol(L,["角色"]),U=findCol(L,["商品網址","網址"]),T=findCol(L,["狀態"]),counts={};
+  (d.table.rows||[]).forEach(row=>{
+    const item={sn:getAnyV(row,S),name:getV(row,N),group:getV(row,G),role:getV(row,R),url:getV(row,U)},quantity=Number(getV(row,Q));
+    if((!item.sn&&!item.name&&!item.url)||!Number.isFinite(quantity)||quantity<=0||/^(?:已?取消|取消訂單|已退款|已退貨|cancelled|canceled)$/i.test(getV(row,T)))return;
+    const key=purchaseQuantityKey(item);counts[key]=(counts[key]||0)+quantity;
   });
-
-  orderedCounts=ok;
-  soldOutCounts=bad;
+  orderedCounts=counts;
+}
+function purchaseQuantityKeys(item,groups){
+  const identity=purchaseProductIdentity(item),keys=[purchaseQuantityKey(item)];
+  // 沒有團名的匯入商品只在目前唯一對應的團使用，避免同貨號跨團誤算。
+  if(norm(item.group)&&groups.get(identity)?.size===1)keys.push(JSON.stringify(['',identity]));
+  return keys;
 }
 
 function productUrlKey(v){
@@ -670,7 +669,7 @@ async function switchTab(key){
   document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
   try{
-    const names=[TABS[key].sheet,"已訂購清單",...(["pending","latest","reminder"].includes(key)?["商品庫存"]:[]),...(["latest","reminder"].includes(key)?["最新開團"]:[])];
+    const names=[TABS[key].sheet,"訂購記錄",...(["pending","latest","reminder"].includes(key)?["商品庫存"]:[]),...(["latest","reminder"].includes(key)?["最新開團"]:[])];
     if(!await helperLoadTables(names,ticket))return;
     let rows=await getSheet(TABS[key].sheet,true),stock;
     await loadOrderedCounts();
@@ -942,12 +941,14 @@ function renderItems(){
 
   const remainOrdered={...orderedCounts},remainSoldOut={...soldOutCounts};
   const showOrdered=["pending","latest","reminder"].includes(currentTab);
-  const statusMap=new WeakMap();
+  const statusMap=new WeakMap(),identityGroups=new Map();
+  allItems.forEach(item=>{const key=purchaseProductIdentity(item);if(!identityGroups.has(key))identityGroups.set(key,new Set());identityGroups.get(key).add(norm(item.group));});
 
   items.forEach(i=>{
     const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
     let status="";
-    if(showOrdered&&(remainOrdered[key]||0)>0){status="ordered";remainOrdered[key]--}
+    const orderedKey=purchaseQuantityKeys(i,identityGroups).find(key=>(remainOrdered[key]||0)>0);
+    if(showOrdered&&orderedKey){status="ordered";remainOrdered[orderedKey]--}
     else if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
     statusMap.set(i,status);
     i._orderStatus=status;
@@ -1361,14 +1362,6 @@ unresolved:[...result.filter(x=>x.kind==="page").map(x=>x.item),...result.filter
 };
 }
 
-function helperPackRecord(ordered,soldOut){
- const pack=items=>items.map(item=>({group:item.group||'',sn:String(item.sn||'').trim(),name:String(item.name||'').trim(),note:item.note||'',extra:item.__extra===true,source:item.source||'',salePrice:item.salePrice??''}));
- return {ordered:pack(ordered),soldOut:pack(soldOut)};
-}
-async function recordOrderedList(ordered,soldOut,requestId){
- return helperWrite('helperRecordOrder',{...helperPackRecord(ordered,soldOut),requestId:requestId||crypto.randomUUID()});
-}
-
 async function handleFinalCheckout(){
 const btn=document.getElementById("send-btn");
 btn.disabled=true;
@@ -1377,7 +1370,7 @@ btn.textContent="正在辨識購物車...";
 const spare=[];
 
 try{
-let pending=helperCheckoutRead();const submitted=pending?.cart||JSON.parse(JSON.stringify(cart));
+const submitted=JSON.parse(JSON.stringify(cart));
 const uniqueUrls=[...new Set(submitted.map(i=>i.url).filter(Boolean))];
 
 for(let i=1;i<uniqueUrls.length;i++){
@@ -1390,11 +1383,7 @@ spare.push(w);
 }
 
 if(submitted.some(i=>cartHost(i.url)==='chiikawa-pocket-goods-store.com'))await requirePocketAdapter();
-const data=pending?.data||await makeCartData(submitted);
-const manual=data.unresolved.map(i=>({...i,note:'🖥️'}));
-if(!pending){pending={cart:submitted,data,requestId:crypto.randomUUID()};helperCheckoutStore(pending);}
-btn.textContent='正在登記訂購…';
-await recordOrderedList([...data.ordered,...manual],data.soldOut,pending.requestId);
+const data=await makeCartData(submitted);
 
 data.soldOut.forEach(i=>{
 const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
@@ -1407,13 +1396,12 @@ spare.slice(used.length).forEach(w=>{try{w.close()}catch{}});
 
 helperRemoveSubmittedCart(submitted);
 saveCart();
-helperCheckoutStore(null);
 updateCartUI();
 closeModal();
 
 if(!data.destinations.length){
 renderItems();
-if(data.soldOut.length)alert("購物車內商品目前都已缺貨，已記錄缺貨");
+if(data.soldOut.length)alert("購物車內商品目前都已缺貨，尚未加入官網購物車");
 btn.disabled=false;
 btn.textContent="確認訂購";
 return;
@@ -2856,8 +2844,7 @@ async function(
 
 
       /*
-        已訂購清單
-        寫到「多」
+        保留多訂卡身分與排單位置
       */
 
       __extra:

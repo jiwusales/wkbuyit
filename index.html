@@ -83,7 +83,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
   z-index:20;
 }
 .group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}@media(min-width:480px){.group-grid{grid-template-columns:repeat(auto-fill,120px)}}
-.card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;cursor:pointer;overflow:hidden;position:relative}
+.card{border:2px solid var(--theme);border-radius:8px;background:#fff;text-align:center;overflow:hidden;position:relative}
 .add-btn-tag{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--theme);color:#fff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;z-index:10}
 .stock-warning{position:absolute;top:3px;left:4px;font-size:15px;line-height:18px;z-index:10}
 .ordered-tag{position:absolute;top:3px;left:5px;color:#E24C60;font-size:18px;font-weight:bold;line-height:1;z-index:10}
@@ -92,8 +92,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .card .buyer{margin:2px 2px 0;font-size:9px;font-weight:bold;line-height:1.2;color:#989FC0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .name{margin:1px 2px;font-size:9px;font-weight:bold;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .price{font-size:10px;margin:1px auto 5px;color:#F68450}
-.product-link{display:inline-block;margin:0 auto 5px;padding:3px 8px;border:1px solid var(--theme);border-radius:6px;color:var(--active);font-size:9px;text-decoration:none;background:#fff}
-.card-overlay{position:fixed;inset:0;background:#000b;z-index:10000;display:flex;justify-content:center;align-items:center}.card-overlay .card{transform:scale(3.1);width:100px;padding:15px 0 5px;pointer-events:none}
+.product-image-link{display:block;cursor:pointer}
 #cart-overlay-bg{position:fixed;inset:0;background:#0006;display:none;z-index:1000}
 #cart-trigger{position:fixed;top:155px;right:15px;width:45px;height:45px;background:#fff;border-radius:50%;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 8px #0003;z-index:999;opacity:.85;cursor:move;touch-action:none}
 #cart-trigger img{width:28px;height:28px;pointer-events:none}#cart-badge{position:absolute;top:-2px;right:-2px;background:#ff4d4f;color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:bold}
@@ -114,7 +113,7 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 
 .visibility-toolbar{display:flex;align-items:center;justify-content:center;gap:8px;padding:5px;font-size:11px;border-top:1px solid #eee}
 .visibility-toolbar button,.group-hide-btn{background:#fff;border:1px solid var(--theme);color:var(--active);border-radius:6px;padding:3px 7px;font-size:10px;cursor:pointer}
-.card-hide-btn{display:block;margin:4px auto;padding:3px 7px;border:1px solid var(--theme);border-radius:5px;background:#fff;color:var(--active);font-size:9px;cursor:pointer;position:relative;z-index:25}
+.card-hide-btn{display:block;margin:4px auto;padding:3px 7px;border:1px solid #E24C60;border-radius:5px;background:#E24C60;color:#fff;font-size:9px;cursor:pointer;position:relative;z-index:25}
 .card.is-hidden{border-style:dashed;background:#f4f0f8}.type-divider.is-hidden{color:#999}
 </style>
 </head>
@@ -1070,7 +1069,6 @@ function createCard(item,status=""){
   }
 
   const warn=normalTab()&&item.colStock==="1";
-  const link=item.url?`<a class="product-link" href="${item.url}" target="_blank" onclick="event.stopPropagation()">商品頁面</a>`:"";
 
   c.className="card";
   c.innerHTML=
@@ -1082,7 +1080,19 @@ function createCard(item,status=""){
   ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
   <div class="name" title="${productText(item)}">${productText(item)}</div>
   <div class="price">${priceText(item.originalPrice)}</div>
-  ${link}${miss}`;
+  ${miss}`;
+
+  if(!noUrl){
+    const img=c.querySelector("img"),link=document.createElement("a");
+    link.className="product-image-link";
+    link.href=String(item.url).trim();
+    link.target="_blank";
+    link.rel="noopener noreferrer";
+    link.setAttribute("aria-label","開啟商品頁面");
+    link.onclick=e=>e.stopPropagation();
+    img.replaceWith(link);
+    link.appendChild(img);
+  }
 
   const btn=c.querySelector(".add-btn-tag");
   if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
@@ -1094,16 +1104,7 @@ function createCard(item,status=""){
   hide.onmousedown=hide.ontouchstart=e=>e.stopPropagation();
   hide.onclick=e=>{e.stopPropagation();toggleHiddenEntry("cards",hiddenCardKey(item))};
   c.appendChild(hide);
-  c.onclick=()=>zoomCard(c);
   return c;
-}
-
-function zoomCard(c){
-const o=document.createElement("div");
-o.className="card-overlay";
-o.appendChild(c.cloneNode(true));
-o.onclick=()=>o.remove();
-document.body.appendChild(o);
 }
 
 function saveCart(){localStorage.setItem("jiwu_helper_cart",JSON.stringify(cart))}

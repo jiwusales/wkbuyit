@@ -504,7 +504,7 @@ async function loadOrderedCounts(){
   const S=findCols(L,["貨號","商品貨號","SKU"],["貨號","SKU"]),N=findCol(L,["名稱","商品名稱","品名"]),Q=findCol(L,["數量"]),G=findCol(L,["團名"]),R=findCol(L,["角色"]),U=findCol(L,["商品網址","網址"]),T=findCol(L,["狀態"]),counts={};
   (d.table.rows||[]).forEach(row=>{
     const item={sn:getAnyV(row,S),name:getV(row,N),group:getV(row,G),role:getV(row,R),url:getV(row,U)},quantity=Number(getV(row,Q));
-    if((!item.sn&&!item.name&&!item.url)||!Number.isFinite(quantity)||quantity<=0||/^(?:已?取消|取消訂單|已退款|已退貨|cancelled|canceled)$/i.test(getV(row,T)))return;
+    if((!item.sn&&!item.name&&!item.url)||!Number.isFinite(quantity)||quantity<=0||/^(?:砍單|已?取消|取消訂單|已退款|已退貨|cancelled|canceled)$/i.test(getV(row,T)))return;
     const key=purchaseQuantityKey(item);counts[key]=(counts[key]||0)+quantity;
   });
   orderedCounts=counts;

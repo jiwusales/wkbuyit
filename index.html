@@ -1074,7 +1074,7 @@ function createCard(item,status=""){
   `
   ${status==="soldout"?'<div class="soldout-tag">❌</div>':""}
   ${warn?'<div class="stock-warning">☝🏻</div>':""}
-  ${(!status&&(!rem||item.url))?'<div class="add-btn-tag">＋</div>':""}
+  ${(!rem||item.url)?'<div class="add-btn-tag">＋</div>':""}
   <img src="${item.img||IMG}">
   ${buyer?`<div class="buyer" title="${buyer}">${buyer}</div>`:""}
   <div class="name" title="${productText(item)}">${productText(item)}</div>

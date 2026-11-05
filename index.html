@@ -278,7 +278,7 @@ window.addEventListener('storage',event=>{if([HELPER_AUTH_KEY,HELPER_TRUST_KEY].
 setInterval(()=>{if(helperAuthenticated&&navigator.onLine&&helperWriteJobs.length)void helperDrainWrites();},30000);
 // helper-db:end
 const IMG="https://i.postimg.cc/bv5xRs04/image.png";
-const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop",pocket:"https://chiikawa-pocket-goods-store.com"},ALLOWED=Object.values(SITES);
+const SITES={chiikawa:"https://chiikawamarket.jp",nagano:"https://nagano-market.jp",mogu:"https://chiikawamogumogu.shop",pocket:"https://chiikawa-pocket-goods-store.com",talking:"https://shop.talking.design"},ALLOWED=Object.values(SITES);
 const MAIN_GROUPS=["ナガノ","ちいかわ","人魚島","ちいかわ樂園"];
 const HIDE_ROLES=["其他角色","綜合角色","全角色","三小隻","水族","食物","動物"];
 const TABS={pending:{label:"待訂購區",sheet:"線上銷售"},latest:{label:"開團待訂區",sheet:"線上銷售"},reminder:{label:"尚未訂購提醒區",sheet:"線上銷售"},chiikawa:{label:"ちいかわ",sheet:"商品庫存"},nagano:{label:"ナガノ",sheet:"商品庫存"},mogu:{label:"もぐもぐ本舖",sheet:"商品庫存"}};
@@ -411,7 +411,7 @@ function updateHiddenToolbar(){
 function col(a,...n){for(const x of n){const i=a.indexOf(x);if(i>=0)return i}return-1}
 function getV(r,i){if(i<0||!r.c||!r.c[i])return"";const c=r.c[i];return String(c.v??c.f??"").trim()}
 function originOf(u){try{return new URL(u).origin}catch{return""}}
-function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"ナガノ":o===SITES.mogu?"もぐもぐ本舖":o===SITES.pocket?"ちいかわポケット":hostKey(o)||"未知官網"}
+function siteName(o){return o===SITES.chiikawa?"ちいかわ":o===SITES.nagano?"ナガノ":o===SITES.mogu?"もぐもぐ本舖":o===SITES.pocket?"ちいかわポケット":o===SITES.talking?"Talking":hostKey(o)||"未知官網"}
 function yen(v){const n=Number(String(v||"").replace(/[^\d.-]/g,""));return Number.isFinite(n)?n:0}
 function fmt(n){return Math.round(n).toLocaleString("ja-JP")}
 function priceText(v){return yen(v)?`¥${fmt(yen(v))}`:"無原價資料"}
@@ -1197,6 +1197,42 @@ function cartHost(url){
 try{return new URL(url).hostname.replace(/^www\./,"")}catch{return""}
 }
 
+function chooseTalkingSize(product){
+ return new Promise((resolve,reject)=>{
+  const dialog=document.createElement('dialog');
+  Object.assign(dialog.style,{width:'min(420px,calc(100vw - 40px))',boxSizing:'border-box',padding:'24px',border:'1px solid #ddd',borderRadius:'12px'});
+  const title=document.createElement('h3');title.textContent=product.title;title.style.margin='0 0 18px';
+  const label=document.createElement('label');label.textContent='選擇尺寸／款式';
+  const select=document.createElement('select');select.setAttribute('aria-label','選擇尺寸／款式');Object.assign(select.style,{display:'block',width:'100%',padding:'12px',margin:'10px 0 20px'});
+  select.add(new Option('請選擇尺寸／款式',''));
+  for(const v of product.variants||[]){const option=new Option(v.title+(v.available?'':'（售完）'),String(v.id));option.disabled=!v.available;select.add(option);}
+  label.append(select);
+  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'12px',justifyContent:'flex-end'});
+  const cancel=document.createElement('button'),confirm=document.createElement('button');cancel.textContent='取消';confirm.textContent='確認尺寸';confirm.disabled=true;
+  for(const button of [cancel,confirm]){button.type='button';button.style.padding='10px 16px';}
+  select.onchange=()=>confirm.disabled=!select.value;
+  let settled=false;
+  confirm.onclick=()=>{settled=true;resolve(select.value);dialog.close();};cancel.onclick=()=>dialog.close();
+  dialog.onclose=()=>{dialog.remove();if(!settled)reject(Error('已取消尺寸選擇，購物車內容已保留'));};
+  actions.append(cancel,confirm);dialog.append(title,label,actions);document.body.append(dialog);dialog.showModal();select.focus();
+ });
+}
+async function resolveTalkingCartItem(item){
+ const u=new URL(item.url),match=u.pathname.match(/\/products\/([^/?#]+)/);
+ if(!match)throw Error('Talking 請使用商品網址，無法從系列網址指定商品');
+ const response=await fetch(`${u.origin}/products/${match[1]}.js`,{cache:'no-store'});
+ if(!response.ok)throw Error('Talking 商品尺寸讀取失敗，請稍後重試');
+ const product=await response.json(),variants=product.variants||[];
+ let id=u.searchParams.get('variant');
+ if(!id){
+  if(variants.length===1)id=String(variants[0].id);
+  else id=await chooseTalkingSize(product);
+ }
+ const variant=variants.find(v=>String(v.id)===id);
+ if(!variant)throw Error('Talking 指定尺寸不存在，請重新選擇');
+ return {kind:'shopify',origin:u.origin,id:String(variant.id),available:variant.available===true,item};
+}
+
 async function tryShopify(item){
   try{
     const u=new URL(item.url),m=u.pathname.match(/\/products\/([^/?#]+)/);
@@ -1278,6 +1314,8 @@ if(host==='chiikawa-pocket-goods-store.com'){
  if(match)return{kind:"pocket",handle:decodeURIComponent(match[1]),variant:u.searchParams.get("variant")||"",item};
 }
 
+if(host==='shop.talking.design')return resolveTalkingCartItem(item);
+
 const shopify=await tryShopify(item);
 if(shopify)return shopify;
 
@@ -1292,7 +1330,12 @@ item
 }
 
 async function makeCartData(items){
-const result=await Promise.all(items.map(resolveCartItem)),shopify={},woo={},destinations=[];
+const talkingChoices=new Map();
+for(const item of items){
+ if(cartHost(item.url)==='shop.talking.design'&&!talkingChoices.has(item.url))talkingChoices.set(item.url,await resolveCartItem(item));
+}
+const result=await Promise.all(items.map(item=>cartHost(item.url)==='shop.talking.design'?{...talkingChoices.get(item.url),item}:resolveCartItem(item)));
+const shopify={},woo={},destinations=[];
 
 result.filter(x=>x.kind==="shopify"&&x.available).forEach(x=>{
 const g=shopify[x.origin]??={qty:{}};

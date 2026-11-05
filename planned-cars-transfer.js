@@ -45,8 +45,8 @@ async function buildPayload(cars,{category='',tab='',isHidden=()=>false,carIndex
    if(existing){existing.quantity++;if(existing.quantity>999)throw Error(`第 ${index+1} 車同款商品超過 999 件，未傳送。`);}
    else aggregated.set(normalized.url,{url:normalized.url,title:normalized.title,image:normalized.image,quantity:1});
   });
-  const items=[...aggregated.values()],suffix=` 第${index+1}車`,label=String(category||'網頁排車').trim()||'網頁排車';
-  prepared.push({host,name:label.slice(0,60-suffix.length)+suffix,items,index});
+  const items=[...aggregated.values()];
+  prepared.push({host,name:`第${index+1}車`,items,index});
  });
  if(!prepared.length)throw Error('目前沒有可傳送的排車商品。');
  const batches=await Promise.all(prepared.map(async({index,...batch})=>({...batch,sourceKey:'helper-plan:'+await digest(JSON.stringify([String(tab),String(category),index,batch.host,batch.items.map(item=>[item.url,item.quantity])]))})));

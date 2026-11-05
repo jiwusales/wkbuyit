@@ -788,72 +788,18 @@ return true;
 }
 function itemCartLimit(i,dollLimit){return isLimitedDoll(i)?Math.max(1,Math.min(2,Number(dollLimit)||1)):Infinity}
 
-function buildPlanAttempt(items,dollLimit,carCount,randomize=false){
-const cars=Array.from({length:carCount},()=>({items:[],total:0,counts:{}}));
-const byKey={};
-items.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
-let groups=Object.values(byKey).map(a=>[...a]);
-if(randomize)groups.sort(()=>Math.random()-.5);
-groups.sort((a,b)=>{
-const qa=Math.ceil(a.length/itemCartLimit(a[0],dollLimit)),qb=Math.ceil(b.length/itemCartLimit(b[0],dollLimit));
-return qb-qa||b.length-a.length||Math.max(...b.map(x=>yen(x.originalPrice)))-Math.max(...a.map(x=>yen(x.originalPrice)));
-});
-
-groups.forEach(group=>{
-if(randomize)group.sort(()=>Math.random()-.5);else group.sort((a,b)=>yen(b.originalPrice)-yen(a.originalPrice));
-group.forEach(i=>{
-const k=itemOrderKey(i),limit=itemCartLimit(i,dollLimit);
-let choices=cars.filter(c=>(c.counts[k]||0)<limit);
-if(!choices.length)return;
-choices.sort((a,b)=>{
-const ad=Math.max(0,ORDER_TARGET-a.total),bd=Math.max(0,ORDER_TARGET-b.total);
-const as=Math.abs(ad-yen(i.originalPrice)),bs=Math.abs(bd-yen(i.originalPrice));
-if(a.total<ORDER_TARGET&&b.total>=ORDER_TARGET)return-1;
-if(b.total<ORDER_TARGET&&a.total>=ORDER_TARGET)return 1;
-return as-bs||a.total-b.total||(randomize?Math.random()-.5:0);
-});
-const c=choices[0];
-c.items.push(i);c.total+=yen(i.originalPrice);c.counts[k]=(c.counts[k]||0)+1;
-});
+// Different products share the first eligible car; only per-item limits create more cars.
+function makeOrderPlan(items,dollLimit){
+const cars=[];
+items.filter(i=>!isTmall(i)).forEach(item=>{
+const key=itemOrderKey(item),limit=itemCartLimit(item,dollLimit);
+let car=cars.find(car=>(car.counts[key]||0)<limit);
+if(!car){car={items:[],total:0,counts:{}};cars.push(car);}
+car.items.push(item);
+car.total+=yen(item.originalPrice);
+car.counts[key]=(car.counts[key]||0)+1;
 });
 return cars;
-}
-
-function planScore(cars){
-const under=cars.filter(c=>c.total<ORDER_TARGET),def=under.reduce((s,c)=>s+ORDER_TARGET-c.total,0);
-const spread=Math.max(...cars.map(c=>c.total))-Math.min(...cars.map(c=>c.total));
-return under.length*1e9+def*1e4+spread;
-}
-
-function makeOrderPlan(items,dollLimit){
-const usable=items.filter(i=>!isTmall(i));
-if(!usable.length)return[];
-const byKey={};usable.forEach(i=>(byKey[itemOrderKey(i)]??=[]).push(i));
-const total=usable.reduce((s,i)=>s+yen(i.originalPrice),0);
-const minCars=Math.max(1,...Object.values(byKey).map(a=>Math.ceil(a.length/itemCartLimit(a[0],dollLimit))));
-let carCount=Math.max(minCars,Math.floor(total/ORDER_TARGET)||1),best=null;
-
-for(let n=carCount;n>=minCars;n--){
-if(total<n*ORDER_TARGET)continue;
-let local=null;
-for(let t=0;t<250;t++){
-const cars=buildPlanAttempt(usable,dollLimit,n,t>0);
-if(cars.some(c=>!c.items.length))continue;
-if(!local||planScore(cars)<planScore(local))local=cars;
-if(cars.every(c=>c.total>=ORDER_TARGET)){best=cars;break}
-}
-if(best)break;
-if(local&&!best)best=local;
-}
-
-if(!best){
-best=buildPlanAttempt(usable,dollLimit,minCars,false);
-for(let t=0;t<250;t++){
-const x=buildPlanAttempt(usable,dollLimit,minCars,true);
-if(planScore(x)<planScore(best))best=x;
-}
-}
-return best.filter(c=>c.items.length);
 }
 
 function addPlannedCart(items,btn){
@@ -879,7 +825,7 @@ row.querySelector(".auto-order-count").textContent=`${c.items.length}件`;
 row.querySelector(".auto-order-total").textContent=`¥${fmt(c.total)}`;
 const st=row.querySelector(".auto-order-status");
 st.className=`auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}`;
-st.textContent=ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`;
+st.textContent=ok?"✓ 已達免運":`免運差 ¥${fmt(ORDER_TARGET-c.total)}`;
 }
 
 function makeDraggable(el,item,carIndex){
@@ -904,7 +850,7 @@ const row=document.createElement("div");
 row.className="auto-order-row";
 row.dataset.car=n;
 const ok=c.total>=ORDER_TARGET;
-row.innerHTML=`<div class="auto-order-no">${n+1}</div><div class="auto-order-main"><div class="auto-order-meta"><span class="auto-order-count">${c.items.length}件</span><span class="auto-order-total">¥${fmt(c.total)}</span><span class="auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已滿 ¥11,000":`差 ¥${fmt(ORDER_TARGET-c.total)}`}</span></div><div class="auto-order-grid" data-car="${n}"></div></div><button class="auto-order-add">＋</button>`;
+row.innerHTML=`<div class="auto-order-no">${n+1}</div><div class="auto-order-main"><div class="auto-order-meta"><span class="auto-order-count">${c.items.length}件</span><span class="auto-order-total">¥${fmt(c.total)}</span><span class="auto-order-status ${ok?"auto-order-ok":"auto-order-warn"}">${ok?"✓ 已達免運":`免運差 ¥${fmt(ORDER_TARGET-c.total)}`}</span></div><div class="auto-order-grid" data-car="${n}"></div></div><button class="auto-order-add">＋</button>`;
 const grid=row.querySelector(".auto-order-grid");
 
 c.items.forEach(i=>{
@@ -2325,13 +2271,6 @@ function restoreCarsSafely(
         choices.length
       ){
 
-        choices.sort(
-          (a,b)=>
-            a.car.total-
-            b.car.total
-        );
-
-
         const target=
           choices[0].car;
 
@@ -2960,10 +2899,7 @@ async function(
           }
 
 
-          return(
-            a.car.total-
-            b.car.total
-          );
+          return a.n-b.n;
 
         }
       );
@@ -3478,8 +3414,8 @@ async function(
 
             ${
               ok
-                ?"✓ 已滿 ¥11,000"
-                :`差 ¥${fmt(
+                ?"✓ 已達免運"
+                :`免運差 ¥${fmt(
                     ORDER_TARGET-
                     car.total
                   )}`
@@ -3906,7 +3842,7 @@ async function(
   function renderCars(){
 
     target.innerHTML="";
-    globalThis.JiwuPlannedCarsTransfer?.mount(target,()=>cars,{category,tab:currentTab,isHidden:isItemHidden});
+    globalThis.JiwuPlannedCarsTransfer?.mount(target,()=>cars,{category,tab:currentTab,isHidden:isItemHidden,repack:()=>{cars=makeOrderPlan(cars.flatMap(car=>car.items),dollLimit);save();renderCars();}});
 
 
     cars.forEach(

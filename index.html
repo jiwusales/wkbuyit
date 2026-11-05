@@ -557,14 +557,10 @@ function productUrlKey(v){
     const u=new URL(String(v||"").trim());
     const host=u.hostname.replace(/^www\./,"").toLowerCase();
     const path=u.pathname.replace(/\/+$/,"");
-    // 天貓／淘寶以查詢參數區分商品與款式；保留識別碼，忽略追蹤參數。
-    const identity=new URLSearchParams();
-    const keys=/(^|\.)((tmall|taobao)\.com)$/.test(host)
-      ?["id","skuId"]:["variant"];
-    for(const key of keys){
-      const value=u.searchParams.get(key);
-      if(value)identity.set(key,value);
-    }
+    // ItemID／sci、variant、skuId 等參數可能識別不同款式，只移除追蹤資訊。
+    const identity=new URLSearchParams(u.search);
+    for(const key of [...identity.keys()])if(/^utm_|^(?:fbclid|gclid|msclkid|ttclid|srsltid|_pos|_sid|_ss)$/i.test(key))identity.delete(key);
+    identity.sort();
     const query=identity.toString();
     return host+path+(query?`?${query}`:"");
   }catch{return norm(v)}
@@ -617,6 +613,17 @@ function findStock(item,stock,strictGroup=false){
   return null;
 }
 
+function productImage(item,catalog){
+  if(item.img)return item.img;
+  const name=norm(productText(item)),group=norm(item.group),sn=norm(item.sn),origin=originOf(item.url);
+  const matches=x=>x.img&&norm(productText(x))===name&&(!sn||!norm(x.sn)||sn===norm(x.sn))&&(!origin||!originOf(x.url)||origin===originOf(x.url));
+  for(const pool of [catalog.filter(x=>norm(x.group)===group),group?catalog.filter(x=>!norm(x.group)):[]]){
+    const images=new Set(pool.filter(matches).map(x=>String(x.img).trim()).filter(Boolean));
+    if(images.size)return images.size===1?[...images][0]:'';
+  }
+  return '';
+}
+
 function mergeStock(item,stock){
   const s=findStock(item,stock);
   return{
@@ -624,7 +631,7 @@ function mergeStock(item,stock){
     ip:item.ip||s?.ip||"",
     role:item.role||s?.role||"",
     type:item.type||s?.type||"",
-    img:s?.img||item.img||"",
+    img:productImage(item,stock),
     url:item.url||s?.url||"",
     sn:hasSn(item)?String(item.sn).trim():(s?.sn??""),
     originalPrice:s?.originalPrice||item.originalPrice||""
@@ -635,7 +642,7 @@ function mergeLatestPrice(item,latest){
   const s=findStock(item,latest,true);
   return{
     ...item,
-    img:s?.img||item.img||"",
+    img:productImage(item,latest),
     sn:hasSn(item)?String(item.sn).trim():(s?.sn??""),
     url:item.url||s?.url||"",
     originalPrice:s?.originalPrice||item.originalPrice||""
@@ -648,8 +655,9 @@ function hydrateHelperImages(rows,ticket){
  if(!globalThis.JiwuHelperImages)return;
  void JiwuHelperImages.hydrate(rows,{isCurrent:()=>ticket===helperLoadTicket&&helperAuthenticated,onImage:(row,image)=>{
   row.img=image;
-  for(const item of allItems)if(item.url===row.url&&!item.img)item.img=image;
-  for(const node of document.querySelectorAll('img[data-jiwu-product-url]'))if(node.dataset.jiwuProductUrl===row.url)node.src=image;
+  const key=helperImageKey(row);
+  for(const item of allItems)if(helperImageKey(item)===key&&!item.img)item.img=image;
+  for(const node of document.querySelectorAll('img[data-jiwu-image-key]'))if(node.dataset.jiwuImageKey===key)node.src=image;
  }});
 }
 
@@ -1046,7 +1054,7 @@ function createCard(item,status=""){
     link.appendChild(img);
   }
 
-  const photo=c.querySelector("img");photo.loading="lazy";photo.decoding="async";if(!item.img&&item.url)photo.dataset.jiwuProductUrl=item.url;
+  const photo=c.querySelector("img");photo.loading="lazy";photo.decoding="async";if(!item.img&&item.url)photo.dataset.jiwuImageKey=helperImageKey(item);
   const btn=c.querySelector(".add-btn-tag");
   if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
   c.classList.toggle("is-hidden",isItemHidden(item));
@@ -1059,6 +1067,8 @@ function createCard(item,status=""){
   c.appendChild(hide);
   return c;
 }
+
+function helperImageKey(item){return JSON.stringify([item.group,item.url,item.sn,item.name,item.role].map(value=>String(value||'').replace(/\s+/g,'')));}
 
 function saveCart(){localStorage.setItem("jiwu_helper_cart",JSON.stringify(cart))}
 

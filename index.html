@@ -178,7 +178,7 @@ async function helperRequest(action,params={}){
  const token=helperToken();if(!['authLogin','authWarmup','authCheck'].includes(action)&&!token){helperShowLogin();throw Error('請先登入後台');}
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
  try{
-  const response=await fetch(HELPER_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...params,action,...(token?{token}:{}),requestId:params.requestId||crypto.randomUUID()}),signal:controller.signal});
+  const response=await fetch(HELPER_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...params,action,...(action==='helperSnapshot'&&typeof currentTab==='string'&&['pending','latest','reminder'].includes(currentTab)?{helperView:'pending'}:{}),...(token?{token}:{}),requestId:params.requestId||crypto.randomUUID()}),signal:controller.signal});
   const data=await response.json();if(!response.ok||data.ok===false){
    if(data.error==='登入已失效，請重新登入'&&token===helperToken()){sessionStorage.removeItem(HELPER_AUTH_KEY);localStorage.removeItem(HELPER_TRUST_KEY);helperShowLogin(data.error);}
    throw Error(data.error||'資料儲存失敗');
@@ -503,6 +503,7 @@ async function getSheet(sheet,force=false){
     img:findCol(L,["圖片","首圖","圖片網址"]),
     url:findCol(L,["商品網址","網址","URL","url","商品URL"],["商品網址","URL"]),
     status:findCol(L,["狀態"]),
+    cargo:findCol(L,["貨況"]),
     group:findCol(L,["團名"]),
     source:findCol(L,["來源"]),
     customer:findCol(L,["顧客名稱","購買人","訂購人"])
@@ -520,6 +521,7 @@ async function getSheet(sheet,force=false){
     img:getV(r,C.img),
     url:getV(r,C.url),
     status:getV(r,C.status),
+    cargo:getV(r,C.cargo),
     group:getV(r,C.group),
     source:getV(r,C.source),
     customer:getV(r,C.customer)
@@ -528,6 +530,8 @@ async function getSheet(sheet,force=false){
   sheetCache[sheet]=rows;
   return rows;
 }
+
+function isRestockRegistration(item){return [item.cargo,item.status].some(value=>/^(?:補貨登記|補登\d*|SOLDOUT|S☹LDOUT)$/i.test(String(value||'').normalize('NFKC').replace(/[\s\uFE0F]/g,'')));}
 
 function purchaseProductIdentity(item){
   if(item.url&&originOf(item.url)==='https://chiikawa-pocket-goods-store.com')return `U:${productUrlKey(item.url)}`;
@@ -566,60 +570,68 @@ function productUrlKey(v){
   }catch{return norm(v)}
 }
 
+// Catalog arrays are immutable read snapshots; old snapshots can be garbage-collected.
+const helperCatalogIndexes=new WeakMap();
+function helperCatalogIndex(catalog){
+  const cached=helperCatalogIndexes.get(catalog);
+  if(cached&&cached.length===catalog.length)return cached;
+  const scope=()=>({sn:new Map(),url:new Map(),names:new Map(),full:new Map(),display:new Map()});
+  const index={length:catalog.length,all:scope(),groups:new Map()};
+  const add=(map,key,entry)=>{let entries=map.get(key);if(!entries)map.set(key,entries=[]);entries.push(entry);};
+  catalog.forEach((item,position)=>{
+    const entry={item,position,group:norm(item.group),sn:norm(item.sn),url:productUrlKey(item.url),name:norm(item.name),role:norm(item.role),origin:originOf(item.url),image:String(item.img||'').trim()};
+    entry.signature=JSON.stringify([entry.sn,entry.url,entry.name,entry.role,yen(item.originalPrice),entry.image]);
+    const names=JSON.stringify([entry.name,entry.role]),full=new Set([norm(`${item.name}${item.role}`),norm(`${item.role}${item.name}`)]),display=norm(productText(item));
+    let grouped=index.groups.get(entry.group);if(!grouped)index.groups.set(entry.group,grouped=scope());
+    for(const bucket of [index.all,grouped]){
+      add(bucket.sn,entry.sn,entry);add(bucket.url,entry.url,entry);add(bucket.names,names,entry);add(bucket.display,display,entry);
+      for(const value of full)add(bucket.full,value,entry);
+    }
+  });
+  helperCatalogIndexes.set(catalog,index);return index;
+}
+function helperCatalogUnique(entries,compatible){
+  let first=null,signature='';
+  for(const entry of entries||[]){
+    if(!compatible(entry))continue;
+    if(!first){first=entry;signature=entry.signature;}
+    else if(entry.signature!==signature)return {found:true,item:null};
+  }
+  return {found:!!first,item:first?.item||null};
+}
 function findStock(item,stock,strictGroup=false){
   const group=norm(item.group),sn=norm(item.sn),url=productUrlKey(item.url);
-  const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`);
-  // 不以名稱跨團補資料，避免同名新品取得另一團的貨號、網址或價格。
-  const sameGroup=stock.filter(x=>norm(x.group)===group);
-  const ungrouped=group?stock.filter(x=>!norm(x.group)):[];
-  function compatible(x){
-    if(sn&&norm(x.sn)&&norm(x.sn)!==sn)return false;
-    if(url&&productUrlKey(x.url)&&productUrlKey(x.url)!==url)return false;
-    return true;
-  }
-  function unique(matches){
-    if(!matches.length)return null;
-    // 重複庫存列可以合併使用；不同商品或不同價格則不猜測。
-    const keys=new Set(matches.map(x=>JSON.stringify([norm(x.sn),productUrlKey(x.url),norm(x.name),norm(x.role),yen(x.originalPrice),String(x.img||"").trim()])));
-    return keys.size===1?matches[0]:null;
-  }
+  const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`),index=helperCatalogIndex(stock);
+  const pools=[index.groups.get(group),group?index.groups.get(''):null];
+  const compatible=entry=>(!sn||!entry.sn||entry.sn===sn)&&(!url||!entry.url||entry.url===url);
   function byIdentity(pool){
-    if(sn){
-      const candidates=pool.filter(x=>norm(x.sn)===sn&&compatible(x));
-      if(candidates.length)return {found:true,item:unique(candidates)};
-    }
-    if(url){
-      const candidates=pool.filter(x=>productUrlKey(x.url)===url&&compatible(x));
-      if(candidates.length)return {found:true,item:unique(candidates)};
-    }
-    return {found:false,item:null};
+    if(!pool)return {found:false};
+    if(sn){const match=helperCatalogUnique(pool.sn.get(sn),compatible);if(match.found)return match;}
+    if(url){const match=helperCatalogUnique(pool.url.get(url),compatible);if(match.found)return match;}
+    return {found:false};
   }
-  for(const pool of [sameGroup,ungrouped]){
-    const match=byIdentity(pool);
-    if(match.found)return match.item;
-  }
-  if(!strictGroup){
-    const match=byIdentity(stock);
-    if(match.found)return match.item;
-  }
+  for(const pool of pools){const match=byIdentity(pool);if(match.found)return match.item;}
+  if(!strictGroup){const match=byIdentity(index.all);if(match.found)return match.item;}
   if(!name)return null;
-  for(const pool of [sameGroup,ungrouped]){
-    const candidates=pool.filter(x=>compatible(x)&&(
-      (norm(x.name)===name&&norm(x.role)===role)||
-      norm(`${x.name}${x.role}`)===full||norm(`${x.role}${x.name}`)===full
-    ));
-    if(candidates.length)return unique(candidates);
+  for(const pool of pools){
+    if(!pool)continue;
+    const entries=[...new Set([...(pool.names.get(JSON.stringify([name,role]))||[]),...(pool.full.get(full)||[])])].sort((a,b)=>a.position-b.position);
+    const match=helperCatalogUnique(entries,compatible);if(match.found)return match.item;
   }
   return null;
 }
 
 function productImage(item,catalog){
   if(item.img)return item.img;
-  const name=norm(productText(item)),group=norm(item.group),sn=norm(item.sn),origin=originOf(item.url);
-  const matches=x=>x.img&&norm(productText(x))===name&&(!sn||!norm(x.sn)||sn===norm(x.sn))&&(!origin||!originOf(x.url)||origin===originOf(x.url));
-  for(const pool of [catalog.filter(x=>norm(x.group)===group),group?catalog.filter(x=>!norm(x.group)):[]]){
-    const images=new Set(pool.filter(matches).map(x=>String(x.img).trim()).filter(Boolean));
-    if(images.size)return images.size===1?[...images][0]:'';
+  const name=norm(productText(item)),group=norm(item.group),sn=norm(item.sn),origin=originOf(item.url),index=helperCatalogIndex(catalog);
+  for(const pool of [index.groups.get(group),group?index.groups.get(''):null]){
+    let image='';
+    for(const entry of pool?.display.get(name)||[]){
+      if(!entry.image||(sn&&entry.sn&&sn!==entry.sn)||(origin&&entry.origin&&origin!==entry.origin))continue;
+      if(image&&image!==entry.image)return '';
+      image=entry.image;
+    }
+    if(image)return image;
   }
   return '';
 }
@@ -695,7 +707,7 @@ async function switchTab(key){
       stock=await getSheet("商品庫存",true);
 
       rows=rows
-        .filter(i=>i.name&&i.status==="未訂購"&&MAIN_GROUPS.includes(i.group))
+        .filter(i=>i.name&&i.status==="未訂購"&&!isRestockRegistration(i)&&MAIN_GROUPS.includes(i.group))
         .map(i=>mergeStock(i,stock));
 
       const groupSite={};
@@ -713,7 +725,7 @@ async function switchTab(key){
       const latest=await getSheet("最新開團",true);
 
       rows=rows
-        .filter(i=>i.name&&i.status==="未訂購"&&!MAIN_GROUPS.includes(i.group))
+        .filter(i=>i.name&&i.status==="未訂購"&&!isRestockRegistration(i)&&!MAIN_GROUPS.includes(i.group))
         .map(i=>mergeStock(i,stock))
         .map(i=>mergeLatestPrice(i,latest));
 

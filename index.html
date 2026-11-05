@@ -156,6 +156,8 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 <button class="btn-checkout" id="send-btn" onclick="handleFinalCheckout()">確認訂購</button>
 </div></div>
 
+<script src="planned-cars-transfer.js"></script>
+
 <script>
 // helper-db:start
 const HELPER_API='https://jiwu-mac-relay.jiwusales.workers.dev/functions/v1/jiwu-admin-test';
@@ -3904,6 +3906,7 @@ async function(
   function renderCars(){
 
     target.innerHTML="";
+    globalThis.JiwuPlannedCarsTransfer?.mount(target,()=>cars,{category,tab:currentTab,isHidden:isItemHidden});
 
 
     cars.forEach(
@@ -3946,3 +3949,4 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshSha
 
 </body>
 </html>
+

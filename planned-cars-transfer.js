@@ -1,6 +1,6 @@
 (function(root){
 'use strict';
-const HOSTS=new Set(['chiikawamarket.jp','nagano-market.jp','chiikawamogumogu.shop','chiikawa-pocket-goods-store.com']);
+const HOSTS=new Set(['chiikawamarket.jp','nagano-market.jp','chiikawamogumogu.shop','chiikawa-pocket-goods-store.com','shop.talking.design']);
 const states=new WeakMap();
 function normalizeItem(item,carNumber){
  const fail=()=>{throw Error(`第 ${carNumber} 車有缺少或不支援的商品網址，請先修正後再傳送。`);};

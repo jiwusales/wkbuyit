@@ -28,7 +28,7 @@ body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);
 .order-limit-confirm{height:24px;margin-left:4px;border:0;border-radius:6px;padding:0 8px;background:var(--theme);color:#fff;font-size:10px;font-weight:bold;cursor:pointer}
 .auto-order-wrap{margin:0 0 12px}
 .auto-order-row{display:flex;align-items:flex-start;gap:6px;margin:7px 0}
-.auto-order-no{width:24px;min-width:24px;padding-top:52px;font-size:18px;font-weight:bold;color:#666;line-height:1;text-align:center}
+.auto-order-no{width:56px;min-width:56px;padding-top:52px;font-size:18px;font-weight:bold;color:#666;line-height:1;text-align:center}
 .auto-order-main{flex:1;min-width:0}
 .auto-order-meta{display:flex;align-items:center;gap:8px;margin:0 0 4px 2px;font-size:10px;color:#777}
 .auto-order-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -157,6 +157,7 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 </div></div>
 
 <script src="planned-cars-transfer.js"></script>
+<script src="helper-images.js"></script>
 
 <script>
 // helper-db:start
@@ -164,7 +165,8 @@ const HELPER_API='https://jiwu-mac-relay.jiwusales.workers.dev/functions/v1/jiwu
 const HELPER_AUTH_KEY='jiwu_supabase_test_admin_auth_token',HELPER_TRUST_KEY='jiwu_supabase_test_admin_auth_token_trusted';
 const HELPER_PENDING_KEY='jiwu_helper_supabase_pending_v1';
 let helperAuthenticated=false,helperStarted=false,helperWriteRunning=false,helperProgressTimer=null,helperLoadTicket=0;
-const helperTableCache=new Map(),helperPlanSnapshots=new Map(),helperWriteJobs=[],helperProgressJobs=new Map();
+const helperTableCache=new Map(),helperPlanSnapshots=new Map(),helperWriteJobs=[],helperProgressJobs=new Map(),helperTableReads=new Map();
+let helperInitialSnapshot=null,helperInitFlight=null;
 try{for(const job of JSON.parse(localStorage.getItem(HELPER_PENDING_KEY)||'[]'))if(['helperSavePlan','helperDeletePlan'].includes(job.action)&&job.params?.requestId)helperWriteJobs.push({...job,waiters:[]});}catch{}
 function helperToken(){try{return localStorage.getItem(HELPER_TRUST_KEY)||sessionStorage.getItem(HELPER_AUTH_KEY)||'';}catch{return '';}}
 function helperPersistWrites(){try{localStorage.setItem(HELPER_PENDING_KEY,JSON.stringify(helperWriteJobs.map(({action,params,createdAt})=>({action,params,createdAt}))));}catch(error){console.warn('待儲存資料保留於目前頁面',error);}}
@@ -213,12 +215,24 @@ async function helperDrainWrites(){
   catch(error){helperProgress(job,'失敗',error.message);job.waiters.splice(0).forEach(waiter=>waiter.reject(error));break;}
  }}finally{helperWriteRunning=false;}
 }
+function helperTableNames(key){
+ const names=[TABS[key].sheet,'網站運費'];
+ if(['pending','latest','reminder'].includes(key)){names.push('訂購記錄','商品庫存');if(key!=='pending')names.push('最新開團');}
+ return [...new Set(names)];
+}
 async function helperReadTable(name){
  if(helperTableCache.has(name))return helperTableCache.get(name);
- const data=await helperRequest('helperSnapshot',{sheets:[name]});helperTableCache.set(name,data.tables[name]);return data.tables[name];
+ const token=helperToken(),ticket=helperLoadTicket,key=JSON.stringify([token,ticket,name]);
+ if(!helperTableReads.has(key)){
+  const work=helperRequest('helperSnapshot',{sheets:[name]}).then(data=>{if(token===helperToken()&&ticket===helperLoadTicket)helperTableCache.set(name,data.tables[name]);return data.tables[name];}).finally(()=>helperTableReads.delete(key));
+  helperTableReads.set(key,work);
+ }
+ return helperTableReads.get(key);
 }
 async function helperLoadTables(names,ticket){
- const data=await helperRequest('helperSnapshot',{sheets:[...new Set(names)]});if(ticket!==helperLoadTicket)return false;
+ const first=helperInitialSnapshot;helperInitialSnapshot=null;
+ const data=first&&first.tab===currentTab&&first.token===helperToken()&&names.every(name=>first.data.tables[name])?first.data:await helperRequest('helperSnapshot',{sheets:[...new Set(names)]});
+ if(ticket!==helperLoadTicket)return false;
  helperTableCache.clear();for(const [name,table] of Object.entries(data.tables))helperTableCache.set(name,table);return true;
 }
 function helperCartIdentity(item){return JSON.stringify([item.group||'',String(item.sn||''),item.name||'',item.role||'',item.url||'',item.__extra===true,item.__planId||'']);}
@@ -234,12 +248,29 @@ async function helperLogin(event){
  }catch(failure){error.textContent=failure.message;}finally{button.disabled=false;}
 }
 async function helperStart(){
- void helperDrainWrites();if(helperStarted)return;helperStarted=true;
- try{window.scrollTo(0,0);renderTabs();await Promise.all([refreshSharedHiddenState(false),loadShippingSettings()]);if(!helperAuthenticated)return;updateCartUI();await switchTab(currentTab);window.scrollTo(0,0);}catch(error){helperStarted=false;throw error;}
+ if(helperStarted)return;helperStarted=true;
+ try{
+  window.scrollTo(0,0);renderTabs();updateCartUI();
+  const loading=switchTab(currentTab);
+  // Optional cross-browser visibility sync never blocks the first product paint.
+  void refreshSharedHiddenState(true);
+  await loading;if(!helperAuthenticated)return;
+  void helperDrainWrites();window.scrollTo(0,0);
+ }catch(error){helperStarted=false;throw error;}
 }
-async function helperInit(){
- renderTabs();if(!helperToken()){helperShowLogin();return;}
- try{await helperRequest('authCheck');helperAuthenticated=true;document.getElementById('helper-login').hidden=true;await helperStart();}catch(error){helperShowLogin(error.message);}
+function helperInit(){
+ if(helperInitFlight)return helperInitFlight;
+ renderTabs();const token=helperToken();if(!token){helperShowLogin();return Promise.resolve();}
+ const tab=currentTab;
+ helperInitFlight=(async()=>{
+  try{
+   // The first protected snapshot validates this session and supplies page data in one trip.
+   const data=await helperRequest('helperSnapshot',{sheets:helperTableNames(tab)});
+   if(token!==helperToken())return;
+   helperInitialSnapshot={tab,token,data};helperAuthenticated=true;document.getElementById('helper-login').hidden=true;await helperStart();
+  }catch(error){if(token===helperToken())helperShowLogin(error.message);}
+ })().finally(()=>{helperInitFlight=null;if(helperToken()&&helperToken()!==token)void helperInit();});
+ return helperInitFlight;
 }
 window.addEventListener('online',()=>{if(helperAuthenticated)void helperDrainWrites();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(helperAuthenticated)void helperDrainWrites();else if(helperToken())void helperInit();}});
@@ -613,40 +644,13 @@ function mergeLatestPrice(item,latest){
 
 const imageCache={};
 
-async function getProductImage(url){
-  if(!url)return"";
-  if(imageCache[url]!==undefined)return imageCache[url];
-
-  try{
-    const u=new URL(url),m=u.pathname.match(/\/products\/([^/?#]+)/);
-
-    if(m){
-      try{
-        const r=await fetch(`${u.origin}/products/${m[1]}.js`);
-        if(r.ok){
-          const p=await r.json();
-          const img=p.featured_image||p.images?.[0]||"";
-          if(img)return imageCache[url]=String(img).replace(/^\/\//,"https://");
-        }
-      }catch{}
-    }
-
-    const r=await fetch(url);
-    if(!r.ok)return imageCache[url]="";
-
-    const html=await r.text();
-    const d=new DOMParser().parseFromString(html,"text/html");
-    const img=d.querySelector('meta[property="og:image:secure_url"]')?.content||
-      d.querySelector('meta[property="og:image"]')?.content||
-      d.querySelector('meta[name="twitter:image"]')?.content||"";
-
-    return imageCache[url]=img?new URL(img,url).href:"";
-  }catch{return imageCache[url]=""}
-}
-
-async function fillMissingImages(rows){
-  await Promise.all(rows.map(async i=>{if(!i.img&&i.url)i.img=await getProductImage(i.url)}));
-  return rows;
+function hydrateHelperImages(rows,ticket){
+ if(!globalThis.JiwuHelperImages)return;
+ void JiwuHelperImages.hydrate(rows,{isCurrent:()=>ticket===helperLoadTicket&&helperAuthenticated,onImage:(row,image)=>{
+  row.img=image;
+  for(const item of allItems)if(item.url===row.url&&!item.img)item.img=image;
+  for(const node of document.querySelectorAll('img[data-jiwu-product-url]'))if(node.dataset.jiwuProductUrl===row.url)node.src=image;
+ }});
 }
 
 function filterNormal(rows,key){
@@ -672,10 +676,11 @@ async function switchTab(key){
   document.getElementById("items-wrapper").innerHTML="<div style='padding:40px;color:#999'>載入中...</div>";
 
   try{
-    const names=[TABS[key].sheet,"訂購記錄",...(["pending","latest","reminder"].includes(key)?["商品庫存"]:[]),...(["latest","reminder"].includes(key)?["最新開團"]:[])];
+    const names=helperTableNames(key);
     if(!await helperLoadTables(names,ticket))return;
     let rows=await getSheet(TABS[key].sheet,true),stock;
-    await loadOrderedCounts();
+    if(["pending","latest","reminder"].includes(key))await loadOrderedCounts();else orderedCounts={};
+    void loadShippingSettings().then(()=>{if(ticket===helperLoadTicket)updateCartUI();});
 
     if(key==="pending"){
       stock=await getSheet("商品庫存",true);
@@ -718,7 +723,6 @@ async function switchTab(key){
       rows=filterNormal(rows,key);
     }
 
-    rows=await fillMissingImages(rows);
     if(ticket!==helperLoadTicket||!helperAuthenticated)return;
 
     allItems=rows.map(i=>({
@@ -739,6 +743,7 @@ async function switchTab(key){
     else renderFilters();
 
     renderItems();
+    hydrateHelperImages(rows,ticket);
 
     requestAnimationFrame(()=>{
       document.getElementById("card-container").style.paddingTop=40+document.querySelector(".header-fixed").offsetHeight+"px";
@@ -1044,6 +1049,7 @@ function createCard(item,status=""){
     link.appendChild(img);
   }
 
+  const photo=c.querySelector("img");photo.loading="lazy";photo.decoding="async";if(!item.img&&item.url)photo.dataset.jiwuProductUrl=item.url;
   const btn=c.querySelector(".add-btn-tag");
   if(btn)btn.onclick=e=>addToCart(e,rem?{...item,urlOnly:true}:item);
   c.classList.toggle("is-hidden",isItemHidden(item));
@@ -1414,7 +1420,7 @@ el.addEventListener("touchstart",start,{passive:false});
 
 if("scrollRestoration" in history)history.scrollRestoration="manual";
 
-window.onload=helperInit;
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',helperInit,{once:true});else queueMicrotask(helperInit);
 </script>
 
 <script>
@@ -1729,6 +1735,9 @@ function savePlanRemote(
 
   };
 
+
+  const prior=helperPlanSnapshots.get(key);
+  if(prior?.found&&String(prior.limit||'')===body.limit&&JSON.stringify(prior.cars)===JSON.stringify(body.cars))return;
 
   const cache={
 
@@ -2347,7 +2356,7 @@ function restoreCarsSafely(
    讀取每團限購數量
 ========================= */
 
-async function loadSyncedOrderLimits(){
+async function loadSyncedOrderLimits(ticket=helperLoadTicket,tab=currentTab){
 
   if(
     ![
@@ -2366,11 +2375,15 @@ async function loadSyncedOrderLimits(){
 
 
   ensureSyncIds();
-  try{const batch=await helperRequest('helperLoadPlan',{keys:allCategories.map(planKey)});for(const [key,plan] of Object.entries(batch.plans))helperPlanSnapshots.set(key,plan);}catch(error){console.warn('排單讀取失敗，保留本機排單',error);}
+  const categories=[...allCategories],keys=categories.map(category=>`${tab}|${category}`);let plans={};
+  if(!keys.length)return;
+  try{const batch=await helperRequest('helperLoadPlan',{keys});plans=batch.plans||{};}catch(error){console.warn('排單讀取失敗，保留本機排單',error);for(const key of keys)try{const local=JSON.parse(localStorage.getItem(localPlanKey(key))||'null');if(local)plans[key]=local;}catch{}}
+  if(ticket!==helperLoadTicket||tab!==currentTab)return;
+  for(const key of keys)helperPlanSnapshots.set(key,plans[key]||{ok:true,found:false,cars:[]});
 
   await Promise.all(
 
-    allCategories.map(
+    categories.map(
       async category=>{
 
         const plan=
@@ -2380,7 +2393,7 @@ async function loadSyncedOrderLimits(){
 
 
         if(
-          plan&&
+          ticket===helperLoadTicket&&tab===currentTab&&plan&&
           ["1","2"]
             .includes(
               String(
@@ -2460,8 +2473,9 @@ async function(key){
   ensureSyncIds();
 
 
-  await loadSyncedOrderLimits();
-
+  const ticket=helperLoadTicket;
+  await loadSyncedOrderLimits(ticket,key);
+  if(ticket!==helperLoadTicket||currentTab!==key||!helperAuthenticated)return;
 
   renderItems();
 
@@ -3717,6 +3731,8 @@ async function(
             e.currentTarget
           );
 
+
+    globalThis.JiwuPlannedCarsTransfer?.mountCar(row.querySelector('.auto-order-no'),()=>cars[n],{category,tab:currentTab,carIndex:n,isHidden:isItemHidden});
 
     return row;
 

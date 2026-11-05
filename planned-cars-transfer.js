@@ -55,7 +55,7 @@ function sendPayload(payload,{window:win=root,timeoutMs=15000}={}){
 function style(document){
  if(document.getElementById('jiwu-plan-transfer-style'))return;
  const node=document.createElement('style');node.id='jiwu-plan-transfer-style';
- node.textContent='.plan-extension-transfer{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0;padding:12px;border:1px solid #e8deef;border-radius:9px;background:#fff;text-align:left}.plan-extension-transfer button{flex:0 0 auto;min-height:38px;padding:9px 14px;border:0;border-radius:7px;background:var(--theme,#D9C0FA);color:#333;font:700 13px/1.4 sans-serif;cursor:pointer}.plan-extension-transfer button:disabled{opacity:.55;cursor:wait}.plan-extension-transfer p{flex:1 1 220px;margin:0;font:12px/1.6 sans-serif;color:#666}.plan-extension-transfer [role=status]{flex-basis:100%;font:12px/1.6 sans-serif;overflow-wrap:anywhere}.plan-extension-transfer [role=status]:empty{display:none}';
+ node.textContent='.plan-extension-transfer{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0;padding:12px;border:1px solid #e8deef;border-radius:9px;background:#fff;text-align:left}.plan-extension-transfer button{flex:0 0 auto;min-height:38px;padding:9px 14px;border:0;border-radius:7px;background:var(--theme,#D9C0FA);color:#333;font:700 13px/1.4 sans-serif;cursor:pointer}.plan-extension-transfer .plan-repack{background:#f5f0fa;border:1px solid #d6c7e8}.plan-extension-transfer [hidden]{display:none!important}.plan-extension-transfer button:disabled{opacity:.55;cursor:wait}.plan-extension-transfer p{flex:1 1 220px;margin:0;font:12px/1.6 sans-serif;color:#666}.plan-extension-transfer [role=status]{flex-basis:100%;font:12px/1.6 sans-serif;overflow-wrap:anywhere}.plan-extension-transfer [role=status]:empty{display:none}';
  document.head.appendChild(node);
 }
 function mount(target,getCars,options={}){
@@ -64,16 +64,20 @@ function mount(target,getCars,options={}){
  if(!state){
   const panel=document.createElement('div');panel.className='plan-extension-transfer';
   const button=document.createElement('button');button.type='button';button.textContent='傳送到外掛';
+  const repack=document.createElement('button');repack.type='button';repack.textContent='依品項重排';repack.className='plan-repack';
   const note=document.createElement('p');note.textContent='匯入目前 Chrome 設定檔的待執行清單，保留每車順序。只匯入，不會加購或啟動。';
-  const status=document.createElement('div');status.setAttribute('role','status');status.setAttribute('aria-live','polite');panel.append(button,note,status);
-  state={panel,button,status,getCars,options,busy:false};states.set(target,state);
+  const status=document.createElement('div');status.setAttribute('role','status');status.setAttribute('aria-live','polite');panel.append(button,repack,note,status);
+  state={panel,button,repack,status,getCars,options,busy:false};states.set(target,state);
   button.onclick=async()=>{
-   if(state.busy)return;state.busy=true;button.disabled=true;status.textContent='正在傳送排好的每一車…';
+   if(state.busy)return;state.busy=true;button.disabled=true;repack.disabled=true;status.textContent='正在傳送排好的每一車…';
    try{const payload=await buildPayload(state.getCars(),state.options),result=await sendPayload(payload);status.textContent=`已匯入 ${Number(result.added)||0} 車，略過 ${Number(result.skipped)||0} 車重複清單。請到對應官網的小幫手查看。`;}
    catch(error){status.textContent=error.message||'傳送失敗，請重試。';}
-   finally{state.busy=false;button.disabled=false;}
+   finally{state.busy=false;button.disabled=false;repack.disabled=false;}
   };
+  repack.onclick=()=>{if(state.busy||typeof state.options.repack!=='function')return;state.options.repack();status.textContent='已依品項重排，不以金額拆車；每款限購數量維持原設定。';};
  }else{state.getCars=getCars;state.options=options;}
+ state.repack.hidden=typeof state.options.repack!=='function';
+ state.repack.title='把不同品項優先放同車，重新分組目前已排好的車';
  target.appendChild(state.panel);return state.panel;
 }
 const api={buildPayload,sendPayload,mount};

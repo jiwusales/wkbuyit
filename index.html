@@ -217,7 +217,7 @@ async function helperDrainWrites(){
 }
 function helperTableNames(key){
  const names=[TABS[key].sheet,'網站運費'];
- if(['pending','latest','reminder'].includes(key)){names.push('訂購記錄','商品庫存');if(key!=='pending')names.push('最新開團');}
+ if(['pending','latest','reminder'].includes(key)){names.push('商品庫存');if(key!=='pending')names.push('最新開團');}
  return [...new Set(names)];
 }
 async function helperReadTable(name){
@@ -679,7 +679,8 @@ async function switchTab(key){
     const names=helperTableNames(key);
     if(!await helperLoadTables(names,ticket))return;
     let rows=await getSheet(TABS[key].sheet,true),stock;
-    if(["pending","latest","reminder"].includes(key))await loadOrderedCounts();else orderedCounts={};
+    // 待訂資料已依線上銷售的未訂購狀態篩選，不再用歷史訂購數量重複扣除。
+    orderedCounts={};
     void loadShippingSettings().then(()=>{if(ticket===helperLoadTicket)updateCartUI();});
 
     if(key==="pending"){
@@ -893,17 +894,13 @@ function renderItems(){
   if(selectedRole)items=items.filter(i=>i.category===selectedRole);
   if(!items.length){box.innerHTML="<div style='padding:40px;color:#999'>目前沒有符合的商品</div>";return}
 
-  const remainOrdered={...orderedCounts},remainSoldOut={...soldOutCounts};
-  const showOrdered=["pending","latest","reminder"].includes(currentTab);
-  const statusMap=new WeakMap(),identityGroups=new Map();
-  allItems.forEach(item=>{const key=purchaseProductIdentity(item);if(!identityGroups.has(key))identityGroups.set(key,new Set());identityGroups.get(key).add(norm(item.group));});
+  const remainSoldOut={...soldOutCounts};
+  const statusMap=new WeakMap();
 
   items.forEach(i=>{
     const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
     let status="";
-    const orderedKey=purchaseQuantityKeys(i,identityGroups).find(key=>(remainOrdered[key]||0)>0);
-    if(showOrdered&&orderedKey){status="ordered";remainOrdered[orderedKey]--}
-    else if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
+    if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
     statusMap.set(i,status);
     i._orderStatus=status;
   });
@@ -997,7 +994,7 @@ function renderItems(){
           const planItems=a.filter(i=>!isTmall(i)&&!(statusMap.get(i)||""));
           const excludedItems=a.filter(i=>isTmall(i)||(statusMap.get(i)||""));
 
-          // 還原舊排單時保留已訂購／缺貨商品；新商品仍只從 planItems 補入。
+          // 還原舊排單時保留缺貨商品；新商品仍只從 planItems 補入。
           renderOrderPlan(plan,planItems,orderLimits[c],card,a.filter(i=>!isTmall(i)));
           if(excludedItems.length)grid(excludedItems);
           return;

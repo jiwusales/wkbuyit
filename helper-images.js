@@ -2,15 +2,17 @@
 (function(root){
 'use strict';
 const LIMIT=4,TIMEOUT=4000,SUCCESS_TTL=30*60*1000,MISSING_TTL=60*1000,MAX_CACHE=256;
-const cache=new Map(),pending=new Map(),queue=[];let active=0;
+const cache=new Map(),pending=new Map(),metadata=new Map(),queue=[];let active=0;
 const current=check=>{try{return check()!==false;}catch{return false;}};
 function product(value){
  try{
   const u=new URL(value);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return null;
   u.hash='';const match=u.pathname.match(/\/products\/([^/]+)\/?$/);
-  if(match){u.pathname='/products/'+match[1];u.search='';}
+  const variant=match?u.searchParams.get('variant')||'':'';
+  if(match){u.pathname='/products/'+match[1];u.search='';if(variant)u.searchParams.set('variant',variant);}
   else{for(const key of [...u.searchParams.keys()])if(/^utm_|^(?:fbclid|gclid)$/.test(key))u.searchParams.delete(key);u.searchParams.sort();}
-  return {key:u.href,page:u.href,json:match?u.origin+'/products/'+match[1]+'.js':''};
+  const selectedStyle=u.hostname.replace(/^www\./,'')==='munyugurumi.jp'&&u.pathname==='/itemdetail'&&u.searchParams.has('sci');
+  return {key:u.href,page:u.href,variant,selectedStyle,json:match?u.origin+'/products/'+match[1]+'.js':''};
  }catch{return null;}
 }
 function imageURL(value,base){
@@ -26,6 +28,19 @@ async function read(url,json){
   return await Promise.race([work,timeout]);
  }finally{root.clearTimeout(timer);}
 }
+function productMetadata(url){
+ const prior=metadata.get(url);if(prior&&prior.until>Date.now())return prior.promise;if(prior)metadata.delete(url);
+ const entry={until:Infinity};
+ entry.promise=read(url,true).then(data=>{entry.until=Date.now()+SUCCESS_TTL;return data;},()=>{entry.until=Date.now()+MISSING_TTL;return null;});
+ if(metadata.size>=MAX_CACHE)metadata.delete(metadata.keys().next().value);metadata.set(url,entry);return entry.promise;
+}
+function selectedImage(data,target){
+ if(!target.variant)return imageURL(data?.featured_image||data?.images?.[0],target.page);
+ const variant=data?.variants?.find(value=>String(value.id)===target.variant);
+ if(!variant)return '';
+ const raw=variant.featured_image||variant.featured_media?.preview_image||variant.image||data.images?.find(value=>value&&typeof value==='object'&&value.variant_ids?.some(id=>String(id)===target.variant));
+ return imageURL(raw,target.page);
+}
 function schedule(work){
  return new Promise(resolve=>{queue.push({work,resolve});drain();});
 }
@@ -37,8 +52,12 @@ function drain(){
 }
 async function lookup(target,live){
  if(!live())return {image:'',cacheable:false};
+ // Munyu's shared product cover is not proof of the selected sci/color image.
+ if(target.selectedStyle)return {image:'',cacheable:true};
  if(target.json){
-  try{const data=await read(target.json,true),url=imageURL(data?.featured_image||data?.images?.[0],target.page);if(url)return {image:url,cacheable:true};}catch{}
+  const data=await productMetadata(target.json),url=selectedImage(data,target);if(url)return {image:url,cacheable:true};
+  // A product's generic hero/OG image can depict a different selected variant.
+  if(target.variant)return {image:'',cacheable:true};
  }
  if(!live())return {image:'',cacheable:false};
  try{

@@ -91,7 +91,7 @@ function mountCar(numberColumn,getCar,options={}){
  let state=states.get(numberColumn);
  if(!state){
   const panel=document.createElement('div');panel.className='plan-car-transfer';
-  const button=document.createElement('button');button.type='button';button.textContent='傳送到外掛';
+  const button=document.createElement('button');button.type='button';button.textContent='傳送';
   const status=document.createElement('span');status.setAttribute('role','status');status.setAttribute('aria-live','polite');panel.append(button,status);
   state={panel,button,status,getCar,options,busy:false};states.set(numberColumn,state);
   button.onclick=async()=>{

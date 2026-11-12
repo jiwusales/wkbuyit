@@ -138,7 +138,7 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 <div class="page-tabs-wrapper"><div class="nav-arrow" onclick="tabScroll.scrollBy(-180,0)">❮</div><div class="scroll-container" id="tab-scroll"><div class="page-tabs" id="page-tabs"></div></div><div class="nav-arrow" onclick="tabScroll.scrollBy(180,0)">❯</div></div>
 <div class="nav-bar-wrapper"><div class="nav-arrow" onclick="roleScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="role-scroll"><div class="nav-bar" id="dynamic-nav"></div></div><div class="nav-arrow" onclick="roleScroll.scrollBy(150,0)">❯</div></div>
 <div class="filter-bar-wrapper"><div class="nav-arrow" onclick="filterScroll.scrollBy(-150,0)">❮</div><div class="scroll-container" id="filter-scroll"><div id="filter-bar"></div></div><div class="nav-arrow" onclick="filterScroll.scrollBy(150,0)">❯</div></div>
-<div class="visibility-toolbar"><button id="hidden-toggle" onclick="showHiddenItems=!showHiddenItems;renderItems()">隱藏區</button><span id="hidden-count"></span><span id="hidden-sync-status" role="status"></span></div>
+<div class="visibility-toolbar"><button id="hidden-toggle" onclick="toggleHiddenArea()">隱藏區</button><span id="hidden-count"></span><span id="hidden-sync-status" role="status"></span></div>
 </div>
 
 <div id="card-container"><div id="items-wrapper"></div></div>
@@ -258,7 +258,7 @@ async function helperStart(){
   window.scrollTo(0,0);renderTabs();updateCartUI();
   const loading=switchTab(currentTab);
   // Optional cross-browser visibility sync never blocks the first product paint.
-  void refreshSharedHiddenState(true);
+  queueSharedHiddenStateRefresh();
   await loading;if(!helperAuthenticated)return;
   void helperDrainWrites();window.scrollTo(0,0);
  }catch(error){helperStarted=false;throw error;}
@@ -277,7 +277,11 @@ function helperInit(){
  })().finally(()=>{helperInitFlight=null;if(helperToken()&&helperToken()!==token)void helperInit();});
  return helperInitFlight;
 }
-window.addEventListener('online',()=>{if(helperAuthenticated)void helperDrainWrites();});
+window.addEventListener('online',()=>{
+ if(!helperAuthenticated)return;
+ void helperDrainWrites();
+ if(Object.keys(hiddenPending).length)queueSharedHiddenStateRefresh();
+});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(helperAuthenticated)void helperDrainWrites();else if(helperToken())void helperInit();}});
 window.addEventListener('storage',event=>{if([HELPER_AUTH_KEY,HELPER_TRUST_KEY].includes(event.key)&&!helperAuthenticated&&helperToken())void helperInit();});
 setInterval(()=>{if(helperAuthenticated&&navigator.onLine&&helperWriteJobs.length)void helperDrainWrites();},30000);
@@ -308,7 +312,7 @@ const HIDDEN_REMOTE_KEY="__jiwu_shared_visibility_v1__";
 const HIDDEN_PENDING_KEY="jiwu_helper_hidden_pending_v1";
 const HIDDEN_CARD_MARK="__JIWU_HIDDEN_CARDS_V1__";
 const HIDDEN_GROUP_MARK="__JIWU_HIDDEN_GROUPS_V1__";
-let hiddenSyncBusy=false,hiddenSyncMessage="",hiddenSyncQueue=Promise.resolve(),hiddenPending={};
+let hiddenSyncMessage="",hiddenSyncQueue=Promise.resolve(),hiddenPending={};
 try{hiddenPending=JSON.parse(localStorage.getItem(HIDDEN_PENDING_KEY)||"{}")}catch{}
 function applyHiddenPending(state){
   Object.values(hiddenPending).forEach(change=>{
@@ -361,6 +365,14 @@ async function writeSharedHiddenState(state){
   // 兩列均帶類型標記，避免 API 移除空車後分不出卡片和整團。
   await helperWrite('helperSavePlan',{key:HIDDEN_REMOTE_KEY,group:'隱藏區設定',limit:'1',cars:[[HIDDEN_CARD_MARK,...Object.keys(state.cards)],[HIDDEN_GROUP_MARK,...Object.keys(state.groups)]]});
 }
+function queueSharedHiddenStateRefresh(){
+  hiddenSyncQueue=hiddenSyncQueue.then(refreshSharedHiddenState);
+}
+function toggleHiddenArea(){
+  showHiddenItems=!showHiddenItems;
+  renderItems();
+  if(showHiddenItems)queueSharedHiddenStateRefresh();
+}
 function toggleHiddenEntry(kind,key){
   const hidden=!hiddenState[kind][key];
   hiddenPending[JSON.stringify([kind,key])]={kind,key,hidden,version:Date.now()+Math.random()};
@@ -368,11 +380,10 @@ function toggleHiddenEntry(kind,key){
   cacheHiddenState();
   setHiddenSyncMessage("等待同步…");
   renderItems();
-  hiddenSyncQueue=hiddenSyncQueue.then(()=>refreshSharedHiddenState());
+  queueSharedHiddenStateRefresh();
 }
-async function refreshSharedHiddenState(redraw=true){
-  if(hiddenSyncBusy||!helperAuthenticated)return;
-  hiddenSyncBusy=true;
+async function refreshSharedHiddenState(){
+  if(!helperAuthenticated)return;
   try{
     let remote=await readSharedHiddenState();
     const batch=Object.entries(hiddenPending);
@@ -397,12 +408,12 @@ async function refreshSharedHiddenState(redraw=true){
     hiddenState=remote;
     cacheHiddenState();
     setHiddenSyncMessage(Object.keys(hiddenPending).length?"等待同步…":"已同步");
-    if(changed&&redraw)renderItems();
+    if(changed)renderItems();
   }catch(error){
     // 保留本機操作，下一次刷新自動重試，舊雲端資料不覆蓋剛隱藏的團。
     setHiddenSyncMessage(Object.keys(hiddenPending).length?"已在本機保留，雲端同步待重試":"同步失敗，顯示本機快取");
     console.warn("隱藏設定同步失敗",error);
-  }finally{hiddenSyncBusy=false}
+  }
 }
 
 function updateHiddenToolbar(){
@@ -3958,12 +3969,6 @@ async function(
 
 };
 
-</script>
-
-<script>
-// 開啟、返回頁面與每 30 秒取得其他瀏覽器的隱藏設定。
-setInterval(()=>{if(!document.hidden)refreshSharedHiddenState()},30000);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshSharedHiddenState()});
 </script>
 
 </body>

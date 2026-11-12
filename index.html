@@ -17,6 +17,11 @@
 *{box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:#f9f9f9;margin:0;color:var(--text);text-align:center;overflow-x:hidden}
 .top-bar{position:fixed;top:0;left:0;width:100%;height:40px;background:var(--theme);color:#fff;z-index:999;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:bold}
+.helper-version-switch{position:fixed;top:0;left:12px;z-index:999;display:grid;place-items:center;width:40px;height:40px;border-radius:8px;color:#4f3768;font:18px/1 Arial,sans-serif;text-decoration:none}
+.helper-version-switch[hidden]{display:none}
+.helper-version-switch:hover{background:#4f37681a}
+.helper-version-switch:focus-visible{outline:2px solid var(--active);outline-offset:-3px}
+#helper-login:not([hidden])~.helper-version-switch{z-index:20001}
 .header-fixed{position:fixed;top:40px;width:100%;background:#fff;z-index:998;border-bottom:1px solid #eee}
 .page-tabs-wrapper,.nav-bar-wrapper,.filter-bar-wrapper{display:flex;align-items:center;padding:0 5px}
 .page-tabs-wrapper{height:40px;border-bottom:1px solid #eee}.nav-bar-wrapper{height:38px;border-bottom:1px solid #eee}.filter-bar-wrapper{height:30px}
@@ -133,6 +138,7 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 
 
 <div class="top-bar">吉物敗家小幫手</div>
+<a id="helper-version-switch" class="helper-version-switch" href="http://192.168.1.106:7791/wkbuyit/" aria-label="切換到區網版敗家小幫手" title="切換到區網版敗家小幫手" hidden><span aria-hidden="true">🅷</span></a>
 
 <div class="header-fixed">
 <div class="page-tabs-wrapper"><div class="nav-arrow" onclick="tabScroll.scrollBy(-180,0)">❮</div><div class="scroll-container" id="tab-scroll"><div class="page-tabs" id="page-tabs"></div></div><div class="nav-arrow" onclick="tabScroll.scrollBy(180,0)">❯</div></div>
@@ -167,6 +173,17 @@ body.latest-tab .nav-bar a{padding:5px 3px}
 <script>
 // helper-db:start
 const HELPER_API='https://jiwu-mac-relay.jiwusales.workers.dev/functions/v1/jiwu-admin-test';
+(()=>{
+ const link=document.getElementById('helper-version-switch');
+ const onLan=new URL(HELPER_API,location.href).origin===location.origin;
+ if(onLan){
+  const label='切換到網頁版敗家小幫手';
+  link.href='https://jiwusales.github.io/wkbuyit/index.html';
+  link.title=label;
+  link.setAttribute('aria-label',label);
+ }
+ link.hidden=!onLan&&location.origin!=='https://jiwusales.github.io';
+})();
 const HELPER_AUTH_KEY='jiwu_supabase_test_admin_auth_token',HELPER_TRUST_KEY='jiwu_supabase_test_admin_auth_token_trusted';
 const HELPER_PENDING_KEY='jiwu_helper_supabase_pending_v1';
 let helperAuthenticated=false,helperStarted=false,helperWriteRunning=false,helperProgressTimer=null,helperLoadTicket=0;

@@ -568,7 +568,8 @@ function isRestockRegistration(item){return [item.cargo,item.status].some(value=
 
 function purchaseProductIdentity(item){
   if(item.url&&originOf(item.url)==='https://chiikawa-pocket-goods-store.com')return `U:${productUrlKey(item.url)}`;
-  return item.sn?`S:${norm(item.sn)}`:item.url?`U:${productUrlKey(item.url)}`:`N:${norm(productText(item))}`;
+  const sku=helperSkuKey(item.sn);
+  return sku?`S:${sku}`:item.url?`U:${productUrlKey(item.url)}`:`N:${norm(productText(item))}`;
 }
 function purchaseQuantityKey(item){return JSON.stringify([norm(item.group),purchaseProductIdentity(item)]);}
 async function loadOrderedCounts(){
@@ -602,6 +603,7 @@ function productUrlKey(v){
     return host+path+(query?`?${query}`:"");
   }catch{return norm(v)}
 }
+function helperSkuKey(value){return norm(String(value??'').normalize('NFKC')).toUpperCase();}
 
 // Catalog arrays are immutable read snapshots; old snapshots can be garbage-collected.
 const helperCatalogIndexes=new WeakMap();
@@ -612,7 +614,7 @@ function helperCatalogIndex(catalog){
   const index={length:catalog.length,all:scope(),groups:new Map()};
   const add=(map,key,entry)=>{let entries=map.get(key);if(!entries)map.set(key,entries=[]);entries.push(entry);};
   catalog.forEach((item,position)=>{
-    const entry={item,position,group:norm(item.group),sn:norm(item.sn),url:productUrlKey(item.url),name:norm(item.name),role:norm(item.role),origin:originOf(item.url),image:String(item.img||'').trim()};
+    const entry={item,position,group:norm(item.group),sn:helperSkuKey(item.sn),url:productUrlKey(item.url),name:norm(item.name),role:norm(item.role),origin:originOf(item.url),image:String(item.img||'').trim()};
     entry.signature=JSON.stringify([entry.sn,entry.url,entry.name,entry.role,yen(item.originalPrice),entry.image]);
     const names=JSON.stringify([entry.name,entry.role]),full=new Set([norm(`${item.name}${item.role}`),norm(`${item.role}${item.name}`)]),display=norm(productText(item));
     let grouped=index.groups.get(entry.group);if(!grouped)index.groups.set(entry.group,grouped=scope());
@@ -633,7 +635,7 @@ function helperCatalogUnique(entries,compatible){
   return {found:!!first,item:first?.item||null};
 }
 function findStock(item,stock,strictGroup=false){
-  const group=norm(item.group),sn=norm(item.sn),url=productUrlKey(item.url);
+  const group=norm(item.group),sn=helperSkuKey(item.sn),url=productUrlKey(item.url);
   const name=norm(item.name),role=norm(item.role),full=norm(`${item.name}${item.role}`),index=helperCatalogIndex(stock);
   const pools=[index.groups.get(group),group?index.groups.get(''):null];
   const compatible=entry=>(!sn||!entry.sn||entry.sn===sn)&&(!url||!entry.url||entry.url===url);
@@ -656,7 +658,7 @@ function findStock(item,stock,strictGroup=false){
 
 function productImage(item,catalog){
   if(item.img)return item.img;
-  const name=norm(productText(item)),group=norm(item.group),sn=norm(item.sn),origin=originOf(item.url),index=helperCatalogIndex(catalog);
+  const name=norm(productText(item)),group=norm(item.group),sn=helperSkuKey(item.sn),origin=originOf(item.url),index=helperCatalogIndex(catalog);
   for(const pool of [index.groups.get(group),group?index.groups.get(''):null]){
     let image='';
     for(const entry of pool?.display.get(name)||[]){
@@ -837,7 +839,7 @@ const ORDER_TARGET=11000;
 function isAutoOrderItem(i){return ALLOWED.includes(originOf(i.url))}
 function isTmall(i){return /天貓/.test(String(i.name||""))}
 function planGroup(items){return ["pending","latest","reminder"].includes(currentTab)&&items.some(i=>isAutoOrderItem(i)&&!isTmall(i))}
-function itemOrderKey(i){return norm(i.sn)||norm(`${i.name}|${i.role}`)}
+function itemOrderKey(i){return helperSkuKey(i.sn)||norm(`${i.name}|${i.role}`)}
 function isLimitedDoll(i){
 const n=norm(i.name);
 /* 名稱只要有明確「其他品項」文字，就不算娃；沒有標明品項時一律視為吊娃／娃 */
@@ -951,7 +953,7 @@ function renderItems(){
   const statusMap=new WeakMap();
 
   items.forEach(i=>{
-    const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+    const key=i.sn?`S:${helperSkuKey(i.sn)}`:`N:${norm(i.name)}`;
     let status="";
     if((remainSoldOut[key]||0)>0){status="soldout";remainSoldOut[key]--}
     statusMap.set(i,status);
@@ -1438,7 +1440,7 @@ if(submitted.some(i=>cartHost(i.url)==='chiikawa-pocket-goods-store.com'))await 
 const data=await makeCartData(submitted);
 
 data.soldOut.forEach(i=>{
-const key=i.sn?`S:${norm(i.sn)}`:`N:${norm(i.name)}`;
+const key=i.sn?`S:${helperSkuKey(i.sn)}`:`N:${norm(i.name)}`;
 soldOutCounts[key]=(soldOutCounts[key]||0)+1;
 });
 
@@ -1947,7 +1949,7 @@ function savedPlanParts(
       norm(p[0]),
 
     sn:
-      norm(p[1]),
+      helperSkuKey(p[1]),
 
     name:
       norm(p[2]),
@@ -2042,7 +2044,7 @@ function findSavedItem(
         if(x.sn){
 
           if(
-            norm(i.sn)!==
+            helperSkuKey(i.sn)!==
               x.sn
           ){
 
